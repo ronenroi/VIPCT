@@ -1,0 +1,196 @@
+import collections
+import os, time
+import pickle
+import warnings
+# import sys
+# sys.path.insert(0, '/home/roironen/pytorch3d/projects/')
+import hydra
+import numpy as np
+import torch
+from VIPCT.visualization import SummaryWriter
+from VIPCT.dataset import get_cloud_datasets, trivial_collate
+from VIPCT.CTnet import *
+from VIPCT.util.stats import Stats
+from omegaconf import OmegaConf
+from omegaconf import DictConfig
+
+relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
+mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_est.view(-1),p=1) - torch.norm(ext_gt.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
+
+@hydra.main(config_path=CONFIG_DIR, config_name="basic_test")
+def main(cfg: DictConfig):
+
+    # Set the relevant seeds for reproducibility.
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
+
+    # Device on which to run.
+    if torch.cuda.is_available() and cfg.debug == False:
+        device = "cuda"
+    else:
+        warnings.warn(
+            "Please note that although executing on CPU is supported,"
+            + "the training is unlikely to finish in reasonable time."
+        )
+        device = "cpu"
+        # Init the visualization visdom env.
+    log_dir = os.getcwd()
+    log_dir = log_dir.replace('outputs','test_results')
+    writer = SummaryWriter(log_dir)
+    results_dir = log_dir #os.path.join(log_dir, 'test_results')
+    checkpoint_resume_path = os.path.join(hydra.utils.get_original_cwd(), cfg.checkpoint_resume_path)
+    if len(results_dir) > 0:
+        # Make the root of the experiment directory.
+        # checkpoint_dir = os.path.split(checkpoint_path)
+        os.makedirs(results_dir, exist_ok=True)
+
+    resume_cfg_path = os.path.join(checkpoint_resume_path.split('/checkpoints')[0],'.hydra/config.yaml')
+    net_cfg = OmegaConf.load(resume_cfg_path)
+    cfg=OmegaConf.merge(net_cfg,cfg)
+    # DATA_DIR = os.path.join(current_dir, "data")
+    _, val_dataset, n_cam = get_cloud_datasets(
+        cfg=cfg
+    )
+
+    # Initialize the Radiance Field model.
+    model = CTnet(cfg=cfg, n_cam=n_cam)
+
+    # Move the model to the relevant device.
+    model.to(device)
+    # Resume training if requested.
+    assert os.path.isfile(checkpoint_resume_path)
+    print(f"Resuming from checkpoint {checkpoint_resume_path}.")
+    loaded_data = torch.load(checkpoint_resume_path)
+    model.load_state_dict(loaded_data["model"])
+    # stats = pickle.loads(loaded_data["stats"])
+    # print(f"   => resuming from epoch {stats.epoch}.")
+    # optimizer_state_dict = loaded_data["optimizer"]
+    # start_epoch = stats.epoch
+    # Init stats to None before loading.
+    # stats = None
+    # optimizer_state_dict = None
+    # start_epoch = 0
+
+
+
+    # Initialize the optimizer.
+    # optimizer = torch.optim.Adam(
+    #     model.parameters(),
+    #     lr=cfg.optimizer.lr,
+    # )
+
+    # Load the optimizer state dict in case we are resuming.
+    # if optimizer_state_dict is not None:
+    #     optimizer.load_state_dict(optimizer_state_dict)
+    #     optimizer.last_epoch = start_epoch
+
+    # Init the stats object.
+    stats = Stats(["loss", "relative_error", "lr", "max_memory", "sec/it"])
+
+
+    # The validation dataloader is just an endless stream of random samples.
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=1,
+        num_workers=4,
+        collate_fn=trivial_collate,
+        # sampler=torch.utils.data.RandomSampler(
+        #     val_dataset,
+        #     replacement=True,
+        #     num_samples=cfg.optimizer.max_epochs,
+        # ),
+    )
+    err = torch.nn.MSELoss()
+    # err = torch.nn.L1Loss(reduction='sum')
+    # Set the model to the training mode.
+    model.eval().float()
+    model.eval()
+
+    # Run the main training loop.
+    iteration = -1
+    if writer:
+        val_scatter_ind = np.random.permutation(len(val_dataloader))[:5]
+
+    # Validation
+    loss_val = 0
+    relative_err= []
+    relative_mass_err = []
+    val_i = 0
+    for val_i, val_batch in enumerate(val_dataloader):
+
+    # val_batch = next(val_dataloader.__iter__())
+
+        val_image, extinction, grid, image_sizes, projection_matrix, masks = val_batch#[0]#.values()
+        val_image = torch.tensor(val_image, device=device).float()
+        val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
+        val_camera = PerspectiveCameras(image_size=image_sizes,
+                                 P=torch.tensor(projection_matrix, device=device).float(), device=device)
+        masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
+
+    # Activate eval mode of the model (lets us do a full rendering pass).
+        with torch.no_grad():
+            val_out = model(
+                val_camera,
+                val_image,
+                val_volume,
+                masks
+            )
+            est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(val_volume.extinctions.shape[0],-1)
+
+            if val_out['query_indices'] is None:
+                for i, (out_vol, m) in enumerate(zip(val_out["output"],masks)):
+                    if m is None:
+                        est_vols[i] = out_vol.squeeze(1)
+                    else:
+                        m = m.view(-1)
+                        est_vols[i][m] = out_vol.squeeze(1)
+            else:
+                for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
+                    est_vol[m]=out_vol.squeeze(1)#.reshape(m.shape)[m]
+
+            assert len(est_vols)==1 ##TODO support validation with batch larger than 1
+
+            if False:
+                gt_vol = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(val_volume.extinctions.shape[0],-1)
+                in_vols = val_volume.extinctions.squeeze(1).reshape(val_volume.extinctions.shape[0],-1)
+                for vol, vol1, m in zip(gt_vol, in_vols, val_out['query_indices']):
+                    vol[m] = vol1[m]
+                gt_vol = gt_vol.reshape(val_volume.extinctions.shape).squeeze()
+            else:
+                gt_vol = val_volume.extinctions[0].squeeze()
+            est_vols = est_vols.squeeze().reshape(gt_vol.shape)
+            est_vols[gt_vol==0] = 0
+            est_vols[est_vols<0] = 0
+            loss_val += err(est_vols, gt_vol)
+            # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
+            print(relative_error(ext_est=est_vols,ext_gt=gt_vol))
+            # if relative_error(ext_est=est_vols,ext_gt=gt_vol)>2:
+            #     print()
+            relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            if writer:
+                writer._iter = iteration
+                writer._dataset = 'val'  # .format(val_i)
+                if val_i in val_scatter_ind:
+                    writer.monitor_scatter_plot(est_vols, gt_vol,ind=val_i)
+            # Update stats with the validation metrics.
+
+
+    loss_val /= (val_i + 1)
+    relative_err = np.array(relative_err)
+    relative_mass_err =np.array(relative_mass_err)
+
+    print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
+    relative_err1 = relative_err[relative_err<2]
+    print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
+    if writer:
+        writer._iter = iteration
+        writer._dataset = 'val'#.format(val_i)
+        writer.monitor_loss(loss_val)
+        # writer.monitor_scatterer_error(relative_mass_err, relative_err)
+        # writer.monitor_images(val_image)
+
+
+if __name__ == "__main__":
+    main()

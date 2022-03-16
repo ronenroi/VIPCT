@@ -1,0 +1,82 @@
+import torch
+from torch import nn
+import torch.nn.functional as F
+import torchvision
+from .util import nn_util as util
+from .roi_align import ROIAlign
+# from model.custom_encoder import ConvEncoder
+import torch.autograd.profiler as profiler
+
+
+def _xavier_init(linear):
+    """
+    Performs the Xavier weight initialization of the linear layer `linear`.
+    """
+    torch.nn.init.xavier_uniform_(linear.weight.data)
+
+class Decoder(nn.Module):
+    """
+    2D (Spatial/Pixel-aligned/local) image encoder
+    """
+
+    def __init__(
+            self,
+            type,
+            to_flatten,
+            n_cam,
+            latent_size,
+    ):
+        """
+        :param type Decoder network type.
+        """
+        super().__init__()
+        self.to_flatten = to_flatten
+        if type == 'FixCT':
+            linear1 = torch.nn.Linear(n_cam * latent_size, 512)
+            linear2 = torch.nn.Linear(512, 64)
+            linear3 = torch.nn.Linear(64, 1)
+            _xavier_init(linear1)
+            _xavier_init(linear2)
+            _xavier_init(linear3)
+
+            self.decoder = torch.nn.Sequential(
+                linear1,
+                torch.nn.BatchNorm1d(512),
+                torch.nn.ReLU(True),
+                linear2,
+                torch.nn.BatchNorm1d(64),
+                torch.nn.ReLU(True),
+                linear3
+            )
+        elif type == 'VIPCT':
+            linear1 = torch.nn.Linear(latent_size, 512)
+            linear2 = torch.nn.Linear(512, 64)
+            linear3 = torch.nn.Linear(64, 1)
+            _xavier_init(linear1)
+            _xavier_init(linear2)
+            _xavier_init(linear3)
+
+            self.decoder = torch.nn.Sequential(
+
+                linear1,
+                torch.nn.BatchNorm1d(512),
+                torch.nn.ReLU(True),
+                linear2,
+                torch.nn.BatchNorm1d(64),
+                torch.nn.ReLU(True),
+                linear3
+            )
+
+    def forward(self, x):
+        if not self.to_flatten:
+            x = torch.mean(x,1)
+        return self.decoder(x)
+
+    @classmethod
+    def from_cfg(cls, cfg, latent_size):
+        return cls(
+            type = cfg.decoder.name,
+            to_flatten=cfg.decoder.feature_flatten,
+            n_cam = cfg.data.n_cam,
+            latent_size = latent_size,
+        )

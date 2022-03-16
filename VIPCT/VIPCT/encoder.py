@@ -29,6 +29,7 @@ class Backbone(nn.Module):
             use_first_pool=True,
             norm_type="batch",
             sampling_support=8,
+            to_flatten = False
     ):
         """
         :param backbone Backbone network. Either custom, in which case
@@ -83,6 +84,7 @@ class Backbone(nn.Module):
         self.index_interp = index_interp
         self.index_padding = index_padding
         self.upsample_interp = upsample_interp
+        self.to_flatten = to_flatten
         self.samplers = [ROIAlign((sampling_support,sampling_support), 0.5**scale,0) for scale in range(1,1+self.num_layers)]
         self.net = nn.Linear(sampling_support*sampling_support,1)
             # nn.Sequential(nn.Conv2d(512,512,kernel_size=8,padding=0,bias=False),
@@ -96,7 +98,6 @@ class Backbone(nn.Module):
                                  # nn.MaxPool2d(2),
                                  # )
 
-        nn.Sequential()
         # self.register_buffer("latent", torch.empty(1, 1, 1, 1), persistent=False)
         # self.register_buffer(
         #     "latent_scaling", torch.empty(2, dtype=torch.float32), persistent=False
@@ -156,7 +157,12 @@ class Backbone(nn.Module):
         samples = torch.squeeze(self.net(samples.reshape(samples.shape[0],samples.shape[1],-1)),-1)
         chuncks =  [box.shape[0] for box in boxes]
         samples = torch.split(samples,chuncks)
-        samples = [sample.reshape(*box_center.shape[:-1],-1).transpose(0, 1).reshape(box_center.shape[1],-1) for sample, box_center in zip(samples, box_centers)]
+        if self.to_flatten:
+            samples = [sample.reshape(*box_center.shape[:-1], -1).transpose(0, 1).reshape(box_center.shape[1], -1) for
+                       sample, box_center in zip(samples, box_centers)]
+        else:
+            samples = [sample.reshape(*box_center.shape[:-1], -1).transpose(0, 1) for
+                       sample, box_center in zip(samples, box_centers)]
             # samples.splitreshape(*box_centers.shape[:-1],-1)
         # samples = self.net(samples.reshape(samples.shape[0],samples.shape[1],-1)).reshape(*box_centers.shape[:-1],-1)
         return samples #.transpose(2,3) # (B, Cams,points,features)
@@ -262,7 +268,8 @@ class Backbone(nn.Module):
             upsample_interp=cfg.backbone.upsample_interp,
             feature_scale=cfg.backbone.feature_scale,
             use_first_pool=cfg.backbone.use_first_pool,
-            sampling_support=cfg.backbone.sampling_support
+            sampling_support=cfg.backbone.sampling_support,
+            to_flatten = cfg.decoder.feature_flatten
         )
 
 

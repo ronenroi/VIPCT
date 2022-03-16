@@ -2,8 +2,8 @@ import collections
 import os, time
 import pickle
 import warnings
-import sys
-sys.path.insert(0, '/home/roironen/pyshdom-NN/projects')
+# import sys
+# sys.path.insert(0, '/home/roironen/pyshdom-NN/projects')
 import hydra
 import numpy as np
 import torch
@@ -43,7 +43,7 @@ def main(cfg: DictConfig):
         cfg=cfg
     )
 
-    # Initialize the Radiance Field model.
+    # Initialize the CT model.
     model = CTnet(cfg=cfg, n_cam=n_cam)
 
     # Move the model to the relevant device.
@@ -53,7 +53,7 @@ def main(cfg: DictConfig):
     optimizer_state_dict = None
     start_epoch = 0
 
-    # Init the visualization visdom env.
+    #
     log_dir = os.getcwd()
     writer = SummaryWriter(log_dir)
     checkpoint_dir = os.path.join(log_dir, 'checkpoints')

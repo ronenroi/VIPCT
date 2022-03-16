@@ -12,15 +12,12 @@ from .cameras import PerspectiveCameras
 
 from .mlp_function import MLPWithInputSkips
 from .encoder import Backbone
+from .decoder import Decoder
 from .positinal_encoding import PositionalEncoding
 from .self_attention import SelfAttention
 from .mask import MaskGenerator
 
-def _xavier_init(linear):
-    """
-    Performs the Xavier weight initialization of the linear layer `linear`.
-    """
-    torch.nn.init.xavier_uniform_(linear.weight.data)
+
 
 
 class CTnet(torch.nn.Module):
@@ -62,6 +59,7 @@ class CTnet(torch.nn.Module):
 
         # self._spatial_encoder = Backbone.from_conf(cfg)
         self._image_encoder = Backbone.from_cfg(cfg)
+        self.decoder = Decoder.from_cfg(cfg, self._image_encoder.latent_size)
         # self.harmonic_embedding = PositionalEncoding(cfg.ct_net.n_harmonic_functions_xyz,
         #                                              cfg.ct_net.n_harmonic_functions_dir)
         # self._chunk_size_test = chunk_size_test
@@ -113,22 +111,6 @@ class CTnet(torch.nn.Module):
         # self.attention = SelfAttention(self._image_encoder.latent_size, 8,bias=False)
         # linear1 = torch.nn.Linear(self.n_cam * (self._image_encoder.latent_size
         #                                         + embedding_dim_dir) + embedding_dim_xyz, 512)
-        linear1 = torch.nn.Linear(n_cam * self._image_encoder.latent_size, 512)
-        linear2 = torch.nn.Linear(512, 64)
-        linear3 = torch.nn.Linear(64, 1)
-        _xavier_init(linear1)
-        _xavier_init(linear2)
-        _xavier_init(linear3)
-
-        self.decoder = torch.nn.Sequential(
-            linear1,
-            torch.nn.BatchNorm1d(512),
-            torch.nn.ReLU(True),
-            linear2,
-            torch.nn.BatchNorm1d(64),
-            torch.nn.ReLU(True),
-            linear3
-        )
 
 
 
@@ -205,189 +187,3 @@ class CTnet(torch.nn.Module):
 
         return out
 
-
-# class CTnet_global(torch.nn.Module):
-#     """
-#     """
-#
-#     def __init__(
-#         self,
-#         cfg,
-#         n_cam
-#     ):
-#         """
-#         Args:
-#
-#         """
-#
-#         super().__init__()
-#
-#         # The renderers and implicit functions are stored under the fine/coarse
-#         # keys in ModuleDict PyTorch modules.
-#         # self._renderer = torch.nn.ModuleDict()
-#
-#
-#         # Parse out image dimensions.
-#         image_size = cfg.data.image_size
-#         # chunk_size_test = cfg.raysampler.chunk_size_test
-#         # n_harmonic_functions_xyz = cfg.ct_net.n_harmonic_functions_xyz
-#         # n_harmonic_functions_dir = cfg.ct_net.n_harmonic_functions_dir
-#         n_hidden_neurons_xyz = cfg.ct_net.n_hidden_neurons_xyz
-#         n_hidden_neurons_dir = cfg.ct_net.n_hidden_neurons_dir
-#         n_layers_xyz = cfg.ct_net.n_layers_xyz
-#         n_layers_dir = cfg.ct_net.n_layers_dir
-#         visualization = cfg.visualization.visdom
-#         append_xyz = cfg.ct_net.append_xyz
-#         append_dir = cfg.ct_net.append_dir
-#
-#
-#
-#
-#         # self._spatial_encoder = Backbone.from_conf(cfg)
-#         self._image_encoder = Backbone.from_cfg(cfg)
-#         self.harmonic_embedding = PositionalEncoding(cfg.ct_net.n_harmonic_functions_xyz,
-#                                                      cfg.ct_net.n_harmonic_functions_dir)
-#         # self._chunk_size_test = chunk_size_test
-#         self._image_size = image_size
-#         self.visualization = visualization
-#         self.stop_encoder_grad = cfg.ct_net.stop_encoder_grad
-#         self.dir_at_camera_coordinates = cfg.ct_net.dir_at_camera_coordinates
-#         self.norm_dir = cfg.ct_net.norm_dir
-#         self.n_query = cfg.ct_net.n_query
-#         self.n_cam = n_cam
-#
-#
-#         # self.mlp_xyz = MLPWithInputSkips(
-#         #     n_layers_xyz,
-#         #     self.harmonic_embedding.embedding_dim_xyz + self._image_encoder.latent_size,
-#         #     n_hidden_neurons_xyz,
-#         #     self.harmonic_embedding.embedding_dim_xyz + self._image_encoder.latent_size,
-#         #     n_hidden_neurons_xyz,
-#         #     input_skips=append_xyz,
-#         # )
-#
-#         # self.mlp_dir = MLPWithInputSkips(
-#         #     n_layers_dir,
-#         #     self.harmonic_embedding.embedding_dim_dir,
-#         #     n_hidden_neurons_dir,
-#         #     self.harmonic_embedding.embedding_dim_dir,
-#         #     n_hidden_neurons_dir,
-#         #     input_skips=append_dir,
-#         # )
-#         # if self.mlp_xyz:
-#         #     embedding_dim_xyz = n_hidden_neurons_xyz
-#         # else:
-#         #     embedding_dim_xyz = self.harmonic_embedding.embedding_dim_xyz
-#         #
-#         # if self.mlp_dir:
-#         #     embedding_dim_dir = n_hidden_neurons_dir
-#         # else:
-#         #     embedding_dim_dir = self.harmonic_embedding.embedding_dim_dir
-#         linear1 = torch.nn.Linear(n_hidden_neurons_xyz * self.n_query, self.n_query)
-#         linear2 = torch.nn.Linear(self.n_query, self.n_query)
-#         _xavier_init(linear1)
-#         _xavier_init(linear2)
-#
-#         self.decoder = torch.nn.Sequential(
-#             linear1,
-#             torch.nn.ReLU(True),
-#             linear2,
-#             # torch.nn.ReLU(True)
-#         )
-#
-#
-#     def forward(
-#         self,
-#         cameras: PerspectiveCameras,
-#         image: torch.Tensor,
-#         volume: torch.Tensor,
-#     ) -> Tuple[dict, dict]:
-#         """
-#         Args:
-#             camera_hashes: A unique identifier of a pre-cached camera.
-#             If `None`, the cache is not searched and the sampled rays are
-#             calculated from scratch.
-#             camera: A batch of cameras from which the scene is rendered.
-#             image: A batch of corresponding ground truth images of shape
-#             ('batch_size', ·, ·, 3).
-#             volume: A batch of corresponding ground truth 3D volumes of shape
-#             ('batch_size', Nx, Ny, Nz).
-#
-#         """
-#
-#         if len(image.shape)==3:
-#             image = image[None,...]
-#         volume = Volumes(
-#             densities=volume[None,None],
-#             features=torch.ones(1, 3, *volume.shape, device=volume.device)/10,
-#             voxel_size=3.0 / volume.shape[0],
-#         ).to(volume.device)
-#
-#         query_points = volume.get_coord_grid()
-#         Vbatch, Vx, Vy, Vz, Ncoord = query_points.shape
-#         query_points = query_points.reshape(Vbatch, -1, Ncoord)
-#         n_query = min(self.n_query, query_points.shape[1])
-#         # indices = torch.randperm(query_points.shape[1])[:n_query]
-#         indices = torch.topk(volume.densities().reshape(-1), n_query).indices[torch.randperm(n_query)]
-#         volume = volume.densities().reshape(1,-1)[:, indices]
-#         query_points = query_points[:,indices,:]
-#         image_features = self._image_encoder(image)
-#         for camera, im in zip(cameras, image):
-#             camera.image_size = im.shape[1:3]
-#         del image
-#
-#         viewdirs = []
-#         latent = []
-#         for camera, features in zip(cameras, image_features):
-#
-#             # * Encode the view directions
-#             if self.norm_dir:
-#                 dir = torch.nn.functional.normalize(query_points - camera.get_camera_center(), dim=-1)
-#             else:
-#                 dir = query_points - camera.get_camera_center()
-#             # if self.dir_at_camera_coordinates:
-#             #     R_ = Rotate(camera.R, device=features.device)
-#             #     dir = R_.transform_points(dir)
-#             viewdirs.append(dir)
-#             uv = camera.transform_points_screen(query_points)[..., :2]
-#             latent.append(self._image_encoder.sample_images(features[None],
-#                                                             uv,
-#                                                             torch.tensor(
-#                                                                 [camera.image_size[0], camera.image_size[1]],
-#                                                                 device=uv.device)
-#                                                             ))
-#             del camera
-#             del uv
-#         del image_features
-#         # project the only the first point in each ray
-#         # rays_points_world = torch.stack(rays_points_world)
-#         # xyz = torch.stack(xyz).transpose(0, 1)
-#         viewdirs = torch.stack(viewdirs).transpose(0, 1)
-#         latent = torch.mean(torch.stack(latent).permute(1, 3, 2, 0),-1) ## TODO learn weighting from norm for dir (distance to camera)?
-#
-#         if self.stop_encoder_grad:
-#             latent = latent.detach()
-#         # latent = latent.transpose(0, 1)#.reshape(
-#         #     -1, self.latent_size
-#         # )  # (SB * NS * B, latent)
-#         query_points, viewdirs = self.harmonic_embedding(query_points, viewdirs)
-#         # if self.mlp_dir:
-#         #     viewdirs = self.mlp_dir(viewdirs,viewdirs)
-#         # viewdirs = viewdirs.transpose(1, 2).reshape(*query_points.shape[:2], -1)
-#
-#         latent = torch.cat((latent, query_points),-1)
-#         del query_points
-#         del viewdirs
-#
-#         if self.mlp_xyz:
-#             latent = self.mlp_xyz(latent,latent)
-#
-#         # latent = torch.cat((latent, query_points), dim=-1)
-#         # latent = torch.cat((latent , viewdirs), dim=-1)
-#         latent = latent.reshape(Vbatch, -1)
-#         output = self.decoder(latent)
-#
-#         out = {"output": output, "volume": volume}
-#
-#
-#         return out

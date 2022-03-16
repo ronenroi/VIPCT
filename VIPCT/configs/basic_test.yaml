@@ -1,3 +1,6 @@
+hydra:
+  run:
+    dir: ../test_results/${now:%Y-%m-%d}/${now:%H-%M-%S}
 seed: 3
 debug: False
 checkpoint_resume_path: 'outputs/2022-03-14/12-32-17/checkpoints/cp_120.pth'

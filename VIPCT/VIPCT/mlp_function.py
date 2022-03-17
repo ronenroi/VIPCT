@@ -41,7 +41,6 @@ class MLPWithInputSkips(torch.nn.Module):
         self,
         n_layers: int,
         input_dim: int,
-        output_dim: int,
         skip_dim: int,
         hidden_dim: int,
         input_skips: Tuple[int] = (),
@@ -50,7 +49,6 @@ class MLPWithInputSkips(torch.nn.Module):
         Args:
             n_layers: The number of linear layers of the MLP.
             input_dim: The number of channels of the input tensor.
-            output_dim: The number of channels of the output.
             skip_dim: The number of channels of the tensor `z` appended when
                 evaluating the skip layers.
             hidden_dim: The number of hidden units of the MLP.

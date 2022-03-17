@@ -22,7 +22,8 @@ class Decoder(nn.Module):
     def __init__(
             self,
             type,
-            to_flatten,
+            average_cams,
+            feature_flatten,
             n_cam,
             latent_size,
     ):
@@ -30,7 +31,8 @@ class Decoder(nn.Module):
         :param type Decoder network type.
         """
         super().__init__()
-        self.to_flatten = to_flatten
+        self.average_cams = average_cams
+        self.feature_flatten = feature_flatten
         if type == 'FixCT':
             linear1 = torch.nn.Linear(n_cam * latent_size, 512)
             linear2 = torch.nn.Linear(512, 64)
@@ -68,15 +70,18 @@ class Decoder(nn.Module):
             )
 
     def forward(self, x):
-        if not self.to_flatten:
+        if self.average_cams:
             x = torch.mean(x,1)
+        if self.feature_flatten:
+            x = x.view(x.shape[0],-1)
         return self.decoder(x)
 
     @classmethod
     def from_cfg(cls, cfg, latent_size):
         return cls(
             type = cfg.decoder.name,
-            to_flatten=cfg.decoder.feature_flatten,
+            average_cams=cfg.decoder.average_cams,
+            feature_flatten=cfg.decoder.feature_flatten,
             n_cam = cfg.data.n_cam,
             latent_size = latent_size,
         )

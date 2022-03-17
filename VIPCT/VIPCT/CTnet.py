@@ -13,6 +13,7 @@ from .cameras import PerspectiveCameras
 from .mlp_function import MLPWithInputSkips
 from .encoder import Backbone
 from .decoder import Decoder
+from .feature_encoding import FeatureEncoding
 from .positinal_encoding import PositionalEncoding
 from .self_attention import SelfAttention
 from .mask import MaskGenerator
@@ -53,13 +54,12 @@ class CTnet(torch.nn.Module):
         visualization = cfg.visualization.visdom
         append_xyz = cfg.ct_net.append_xyz
         append_dir = cfg.ct_net.append_dir
-
+        feature_encoding = cfg.ct_net.feature_encoding
 
 
 
         # self._spatial_encoder = Backbone.from_conf(cfg)
         self._image_encoder = Backbone.from_cfg(cfg)
-        self.decoder = Decoder.from_cfg(cfg, self._image_encoder.latent_size)
         # self.harmonic_embedding = PositionalEncoding(cfg.ct_net.n_harmonic_functions_xyz,
         #                                              cfg.ct_net.n_harmonic_functions_dir)
         # self._chunk_size_test = chunk_size_test
@@ -77,18 +77,37 @@ class CTnet(torch.nn.Module):
         self.mask_type = None if cfg.ct_net.mask_type == 'None' else cfg.ct_net.mask_type
         self.val_mask_type = None if cfg.ct_net.val_mask_type == 'None' else cfg.ct_net.val_mask_type
 
+        self.decoder_input_size = self._image_encoder.latent_size
         # self.mask_net = MaskGenerator()
+
         if n_layers_xyz:
             self.mlp_xyz = MLPWithInputSkips(
                 n_layers_xyz,
-                self.harmonic_embedding.embedding_dim_xyz,
-                n_hidden_neurons_xyz,
-                self.harmonic_embedding.embedding_dim_xyz,
-                n_hidden_neurons_xyz,
+                3, #self.harmonic_embedding.embedding_dim_xyz,
+                3,#self.harmonic_embedding.embedding_dim_xyz,
+                64,
                 input_skips=append_xyz,
             )
+            self.mlp_cam_center = MLPWithInputSkips(
+                n_layers_xyz,
+                3,  # self.harmonic_embedding.embedding_dim_xyz,
+                3,  # self.harmonic_embedding.embedding_dim_xyz,
+                64,
+                input_skips=append_xyz,
+            )
+            self.decoder_input_size += 64*2
+            self.decoder_input_size *= n_cam
         else:
             self.mlp_xyz = None
+            self.mlp_cam_center = None
+
+        if feature_encoding:
+            self._feature_encoder = FeatureEncoding(n_harmonic_functions=cfg.feature_encoder.n_harm)
+            self.decoder_input_size *= (1 + 2 * cfg.feature_encoder.n_harm)
+        else:
+            self._feature_encoder = None
+
+        self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size)
 
         # self.mlp_dir = MLPWithInputSkips(
         #     n_layers_dir,
@@ -150,8 +169,18 @@ class CTnet(torch.nn.Module):
             volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
         n_query = [points.shape[0] for points in query_points]
         uv = cameras.project_points(query_points,screen=True)
-        del cameras
+        if self.mlp_cam_center:
+            cam_centers = cameras.get_camera_center()
+            embed_camera_center = self.mlp_cam_center(cam_centers.view(-1,3),cam_centers.view(-1,3)).view(*cam_centers.shape[:-1],-1)
 
+        else:
+            embed_camera_center = None
+        del cameras
+        if self.mlp_xyz:
+            query_points = torch.vstack(query_points).view(-1,3)
+            query_points = self.mlp_xyz(query_points, query_points)
+        else:
+            query_points = None
         if self.training:
             latent = self._image_encoder.sample_roi(image_features, uv)#.transpose(1, 2)
             if self.stop_encoder_grad:
@@ -159,27 +188,56 @@ class CTnet(torch.nn.Module):
 
             # latent = latent.reshape(Vbatch * n_query, -1)
             latent = torch.vstack(latent)
+            if query_points is not None:
+                query_points = query_points.unsqueeze(1).expand(-1,latent.shape[1],-1)
+                latent = torch.cat((latent,query_points),-1)
+                del query_points
+            if embed_camera_center is not None:
+                embed_camera_center = embed_camera_center#.unsqueeze(1).expand(-1,int(latent.shape[0]/Vbatch),-1,-1)
+                # embed_camera_center = embed_camera_center.reshape(-1,*embed_camera_center.shape[2:])
+                latent = torch.split(latent,n_query)
+                latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
+                # del embed_camera_center
+
+            if self._feature_encoder:
+                latent = self._feature_encoder(latent)
             output = self.decoder(latent)#.reshape(Vbatch, n_query)
             output = torch.split(output, n_query)
             out = {"output": output, "volume": volume}
         else:
 
             n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / self.val_n_query))
-            # if n_chunk == 0 or torch.tensor(n_query).sum() < self.val_n_query:
-            #     print()
             uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
+            query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
             output = [torch.empty(0,device=image_features[0].device)] * len(n_query)
             for chunk in range(n_chunk):
                 uv_chunk = [p[chunk] for p in uv]
                 n_split = [points.shape[1] for points in uv_chunk]
                 latent_chunk = self._image_encoder.sample_roi(image_features, uv_chunk)#.transpose(1, 2)
                 latent_chunk = torch.vstack(latent_chunk)
+                if query_points is not None:
+                    assert Vbatch==1
+                    query_points_chunk = query_points[chunk]
+                    query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
+                    latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
+                    del query_points_chunk
+                if embed_camera_center is not None:
+                    assert Vbatch == 1
+                    embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1, int(latent_chunk.shape[0] / Vbatch), -1, -1)
+                    embed_camera_center_chunk = embed_camera_center_chunk.reshape(-1, *embed_camera_center_chunk.shape[2:])
+                    latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
+
+                if self._feature_encoder:
+                    latent_chunk = self._feature_encoder(latent_chunk)
+
                 output_chunk = self.decoder(latent_chunk)
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
             out = {"output": output, "volume": volume, 'query_indices': query_indices}
         del uv
         del image_features
+        del embed_camera_center
+
         # latent = latent  # .reshape(len(cameras),Vbatch * query_points.shape[1], -1)
 
         # volume = torch.vstack(volume)

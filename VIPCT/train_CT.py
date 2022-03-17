@@ -155,11 +155,12 @@ def main(cfg: DictConfig):
                 # Adjust the learning rate.
                 lr_scheduler.step()
 
-            images, extinction, grid, image_sizes, projection_matrix, masks = batch#[0]#.values()
+            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
 
             images = torch.tensor(images, device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
-            cameras = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(), device=device)
+            cameras = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),
+                                         camera_center= torch.tensor(camera_center, device=device).float(), device=device)
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
             if model.mask_type == 'gt_mask':
                 masks = volume.extinctions > volume._ext_thr
@@ -224,11 +225,11 @@ def main(cfg: DictConfig):
 
                 # val_batch = next(val_dataloader.__iter__())
 
-                    val_image, extinction, grid, image_sizes, projection_matrix, masks = val_batch#[0]#.values()
+                    val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch#[0]#.values()
                     val_image = torch.tensor(val_image, device=device).float()
                     val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
-                    val_camera = PerspectiveCameras(image_size=image_sizes,
-                                             P=torch.tensor(projection_matrix, device=device).float(), device=device)
+                    val_camera = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),
+                                         camera_center= torch.tensor(camera_center, device=device).float(), device=device)
                     masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
                     if model.val_mask_type == 'gt_mask':
                         masks = val_volume.extinctions > val_volume._ext_thr

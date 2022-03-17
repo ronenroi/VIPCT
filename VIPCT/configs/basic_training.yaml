@@ -11,13 +11,13 @@ checkpoint_resume_path: 'outputs/2022-03-13/23-49-07/checkpoints/cp_410.pth'
 data:
   dataset_name: 'satellites_images'
   image_size: [261, 261] # [height, width]
-  n_training: 50
+  n_training: -1
   n_val: 20
   n_cam: 10
   rand_cam: True
 optimizer:
-  max_epochs: 1000
-  lr: 0.00005
+  max_epochs: 100000
+  lr: 0.0005
   batch_size: 4
   iter_steps: [50000, 75000]
   lr_scheduler_gamma: 0.1
@@ -32,7 +32,7 @@ ct_net:
   n_harmonic_functions_dir: 2 #4
   n_hidden_neurons_xyz: 64
   n_hidden_neurons_dir: 64
-  n_layers_xyz: 0
+  n_layers_xyz: 4
   n_layers_dir: 2
   append_xyz: [2]
   append_dir: [2]
@@ -45,8 +45,9 @@ ct_net:
   val_mask_type: 'gt_mask' #'space_carving'  #'space_carving' 'gt_mask' None
   query_point_method: 'random' #'topk'
   query_point_val_method: 'all'
+  feature_encoding: False
 backbone:
-  name: 'resnet34' #'resnet34'
+  name: 'resnet50' #'resnet34'
   pretrained: False
   num_layers: 4
   index_interp: 'bilinear'
@@ -55,6 +56,10 @@ backbone:
   feature_scale: 1.0
   use_first_pool: 'batch'
   sampling_support: 5
-decoder:
-  name: 'VIPCT' #'FixCT'
   feature_flatten: False
+decoder:
+  name: 'VIPCT' #'VIPCT' #'FixCT'
+  average_cams: False
+  feature_flatten: True
+feature_encoder:
+  n_harm: 3

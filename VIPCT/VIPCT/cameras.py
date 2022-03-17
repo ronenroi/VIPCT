@@ -35,6 +35,7 @@ class PerspectiveCameras(TensorProperties):
             self,
             image_size: Union[List, Tuple, torch.Tensor],
             focal_length=1.0,
+            camera_center: Optional[torch.Tensor] = None,
             R: Optional[torch.Tensor] = _R,
             T: Optional[torch.Tensor] = _T,
             K: Optional[torch.Tensor] = None,
@@ -89,6 +90,7 @@ class PerspectiveCameras(TensorProperties):
             P=P,
             image_size=image_size
         )
+        self.camera_center = camera_center
         self.index = torch.arange(self._N)
         if (self.image_size < 1).any():  # pyre-ignore
             raise ValueError("Image_size provided has invalid values")
@@ -113,7 +115,7 @@ class PerspectiveCameras(TensorProperties):
             the locations of the center of each camera in the batch.
         """
         # the camera center is the translation component (the last column) of the transform matrix P (3x4 RT matrix)
-        return self.P[:, :, 3]
+        return self.camera_center #self.P[:, :, 3]
 
 
     def _transform_points(self, points, eps: Optional[float] = None) -> List[torch.Tensor]:

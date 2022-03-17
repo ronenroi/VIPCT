@@ -129,6 +129,7 @@ class CloudDataset(Dataset):
         grid = data['net_grid']
         image_sizes = data['image_sizes'][cam_i]
         extinction = data['ext']
+        camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
         mask = None
         if self.mask_type == 'space_carving':
@@ -139,4 +140,4 @@ class CloudDataset(Dataset):
         #     image = self.transform(image)
         # if self.target_transform:
         #     label = self.target_transform(label)
-        return images, extinction, grid, image_sizes, projection_matrix, mask
+        return images, extinction, grid, image_sizes, projection_matrix, camera_center, mask

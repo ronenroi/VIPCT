@@ -269,7 +269,7 @@ class Backbone(nn.Module):
             feature_scale=cfg.backbone.feature_scale,
             use_first_pool=cfg.backbone.use_first_pool,
             sampling_support=cfg.backbone.sampling_support,
-            to_flatten = cfg.decoder.feature_flatten
+            to_flatten = cfg.backbone.feature_flatten
         )
 
 

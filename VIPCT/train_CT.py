@@ -182,10 +182,15 @@ def main(cfg: DictConfig):
             )
 
             # The loss is a sum of coarse and fine MSEs
-            loss = [err(ext_est.squeeze(),ext_gt.squeeze())/torch.norm(ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            if cfg.optimizer.loss == 'L2_relative_error':
+                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/torch.norm(ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'L1_relative_error':
+                loss = [relative_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            else:
+                NotImplementedError
             loss = torch.mean(torch.stack(loss))
-            # loss = err(torch.vstack(out["output"]).squeeze(), torch.cat(out["volume"]).squeeze())
-            # loss = l1(out["output"], out["volume"]) / (torch.sum(out["volume"])+1000)
+
+            # loss = torch.tensor(loss).mean()
 
             # Take the training step.
             loss.backward()

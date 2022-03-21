@@ -121,33 +121,37 @@ def main(cfg: DictConfig):
 
     # val_batch = next(val_dataloader.__iter__())
 
-        val_image, extinction, grid, image_sizes, projection_matrix, masks = val_batch#[0]#.values()
+        val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch  # [0]#.values()
         val_image = torch.tensor(val_image, device=device).float()
         val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
-        val_camera = PerspectiveCameras(image_size=image_sizes,
-                                 P=torch.tensor(projection_matrix, device=device).float(), device=device)
+        val_camera = PerspectiveCameras(image_size=image_sizes, P=torch.tensor(projection_matrix, device=device).float(),
+                                        camera_center=torch.tensor(camera_center, device=device).float(), device=device)
         masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
+        if model.val_mask_type == 'gt_mask':
+            masks = val_volume.extinctions > val_volume._ext_thr
 
     # Activate eval mode of the model (lets us do a full rendering pass).
         with torch.no_grad():
-            val_out = model(
-                val_camera,
-                val_image,
-                val_volume,
-                masks
-            )
-            est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(val_volume.extinctions.shape[0],-1)
+            est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(
+                val_volume.extinctions.shape[0], -1)
 
-            if val_out['query_indices'] is None:
-                for i, (out_vol, m) in enumerate(zip(val_out["output"],masks)):
-                    if m is None:
-                        est_vols[i] = out_vol.squeeze(1)
-                    else:
-                        m = m.view(-1)
-                        est_vols[i][m] = out_vol.squeeze(1)
-            else:
-                for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
-                    est_vol[m]=out_vol.squeeze(1)#.reshape(m.shape)[m]
+            if torch.sum(torch.stack(masks)*1.0) > 0:
+                val_out = model(
+                    val_camera,
+                    val_image,
+                    val_volume,
+                    masks
+                )
+                if val_out['query_indices'] is None:
+                    for i, (out_vol, m) in enumerate(zip(val_out["output"],masks)):
+                        if m is None:
+                            est_vols[i] = out_vol.squeeze(1)
+                        else:
+                            m = m.view(-1)
+                            est_vols[i][m] = out_vol.squeeze(1)
+                else:
+                    for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
+                        est_vol[m]=out_vol.squeeze(1)#.reshape(m.shape)[m]
 
             assert len(est_vols)==1 ##TODO support validation with batch larger than 1
 
@@ -160,7 +164,7 @@ def main(cfg: DictConfig):
             else:
                 gt_vol = val_volume.extinctions[0].squeeze()
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
-            est_vols[gt_vol==0] = 0
+            # est_vols[gt_vol==0] = 0
             est_vols[est_vols<0] = 0
             loss_val += err(est_vols, gt_vol)
             # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
@@ -184,6 +188,10 @@ def main(cfg: DictConfig):
     print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
     relative_err1 = relative_err[relative_err<2]
     print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
+
+    print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
+    relative_mass_err1 = relative_mass_err[relative_mass_err<2]
+    print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
     if writer:
         writer._iter = iteration
         writer._dataset = 'val'#.format(val_i)

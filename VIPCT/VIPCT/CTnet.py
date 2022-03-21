@@ -160,7 +160,7 @@ class CTnet(torch.nn.Module):
         image = image.view(-1, *image.shape[2:])
         image_features = self._image_encoder(image)
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
-        del image
+        # del image
         # mask = self.mask_net(image_features)
 
         if self.training:
@@ -175,7 +175,7 @@ class CTnet(torch.nn.Module):
 
         else:
             embed_camera_center = None
-        del cameras
+        # del cameras
         if self.mlp_xyz:
             query_points = torch.vstack(query_points).view(-1,3)
             query_points = self.mlp_xyz(query_points, query_points)
@@ -187,11 +187,11 @@ class CTnet(torch.nn.Module):
                 latent = [lat.detach() for lat in latent]
 
             # latent = latent.reshape(Vbatch * n_query, -1)
-            latent = torch.vstack(latent)
+            latent = torch.vstack(latent).transpose(0, 1)
             if query_points is not None:
                 query_points = query_points.unsqueeze(1).expand(-1,latent.shape[1],-1)
                 latent = torch.cat((latent,query_points),-1)
-                del query_points
+                # del query_points
             if embed_camera_center is not None:
                 embed_camera_center = embed_camera_center#.unsqueeze(1).expand(-1,int(latent.shape[0]/Vbatch),-1,-1)
                 # embed_camera_center = embed_camera_center.reshape(-1,*embed_camera_center.shape[2:])
@@ -214,13 +214,13 @@ class CTnet(torch.nn.Module):
                 uv_chunk = [p[chunk] for p in uv]
                 n_split = [points.shape[1] for points in uv_chunk]
                 latent_chunk = self._image_encoder.sample_roi(image_features, uv_chunk)#.transpose(1, 2)
-                latent_chunk = torch.vstack(latent_chunk)
+                latent_chunk = torch.vstack(latent_chunk).transpose(0, 1)
                 if query_points is not None:
                     assert Vbatch==1
                     query_points_chunk = query_points[chunk]
                     query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
                     latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
-                    del query_points_chunk
+                    # del query_points_chunk
                 if embed_camera_center is not None:
                     assert Vbatch == 1
                     embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1, int(latent_chunk.shape[0] / Vbatch), -1, -1)
@@ -234,9 +234,9 @@ class CTnet(torch.nn.Module):
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
             out = {"output": output, "volume": volume, 'query_indices': query_indices}
-        del uv
-        del image_features
-        del embed_camera_center
+        # del uv
+        # del image_features
+        # del embed_camera_center
 
         # latent = latent  # .reshape(len(cameras),Vbatch * query_points.shape[1], -1)
 

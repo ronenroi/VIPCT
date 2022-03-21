@@ -34,39 +34,46 @@ class Decoder(nn.Module):
         self.average_cams = average_cams
         self.feature_flatten = feature_flatten
         if type == 'FixCT':
-            linear1 = torch.nn.Linear(n_cam * latent_size, 512)
-            linear2 = torch.nn.Linear(512, 64)
-            linear3 = torch.nn.Linear(64, 1)
+            linear1 = torch.nn.Linear(latent_size, 2048)
+            linear2 = torch.nn.Linear(2048, 512)
+            linear3 = torch.nn.Linear(512, 64)
+            linear4 = torch.nn.Linear(64, 1)
             _xavier_init(linear1)
             _xavier_init(linear2)
             _xavier_init(linear3)
+            _xavier_init(linear4)
 
             self.decoder = torch.nn.Sequential(
                 linear1,
-                torch.nn.BatchNorm1d(512),
+                # torch.nn.BatchNorm1d(512),
                 torch.nn.ReLU(True),
                 linear2,
-                torch.nn.BatchNorm1d(64),
+                # torch.nn.BatchNorm1d(64),
                 torch.nn.ReLU(True),
-                linear3
+                linear3,
+                torch.nn.ReLU(True),
+                linear4
             )
         elif type == 'VIPCT':
-            linear1 = torch.nn.Linear(latent_size, 512)
-            linear2 = torch.nn.Linear(512, 64)
-            linear3 = torch.nn.Linear(64, 1)
+            linear1 = torch.nn.Linear(latent_size, 2048)
+            linear2 = torch.nn.Linear(2048, 512)
+            linear3 = torch.nn.Linear(512, 64)
+            linear4 = torch.nn.Linear(64, 1)
             _xavier_init(linear1)
             _xavier_init(linear2)
             _xavier_init(linear3)
+            _xavier_init(linear4)
 
             self.decoder = torch.nn.Sequential(
-
                 linear1,
-                torch.nn.BatchNorm1d(512),
+                # torch.nn.BatchNorm1d(512),
                 torch.nn.ReLU(True),
                 linear2,
-                torch.nn.BatchNorm1d(64),
+                # torch.nn.BatchNorm1d(64),
                 torch.nn.ReLU(True),
-                linear3
+                linear3,
+                torch.nn.ReLU(True),
+                linear4
             )
 
     def forward(self, x):

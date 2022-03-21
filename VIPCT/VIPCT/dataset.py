@@ -15,8 +15,13 @@ from torch.utils.data import Dataset
 import socket
 # print(socket.gethostname())
 
-DEFAULT_DATA_ROOT = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/roi' \
-if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256'
+# DEFAULT_DATA_ROOT = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/roi' \
+# if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256'
+
+
+DEFAULT_DATA_ROOT = '/wdata/roironen/Data' \
+if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data'
+
 
     # os.path.join(
     # os.path.dirname(os.path.realpath(__file__)), "../../..", "data/data"
@@ -24,7 +29,7 @@ if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/D
 
 # DEFAULT_URL_ROOT = "https://dl.fbaipublicfiles.com/pytorch3d_nerf_data"
 
-ALL_DATASETS = ("satellites_images","dom_satellites_images")
+ALL_DATASETS = ("satellites_images", "dom_satellites_images", "CASS_10cams", "BOMEX_10cams")
 
 
 def trivial_collate(batch):
@@ -75,7 +80,12 @@ def get_cloud_datasets(
         test_dataset: The testing dataset object.
     """
     dataset_name = cfg.data.dataset_name
-    data_root = os.path.join(data_root,dataset_name)
+    if dataset_name == 'CASS_10cams':
+        data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
+    elif dataset_name == 'BOMEX_10cams':
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256')
+    else:
+        data_root = os.path.join(data_root,'BOMEX_256x256x100_5000CCN_50m_micro_256/roi',dataset_name)
     image_size = cfg.data.image_size
     if dataset_name not in ALL_DATASETS:
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
@@ -83,6 +93,21 @@ def get_cloud_datasets(
     print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
     data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
     train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
+    # for file in data_train_paths:
+    #     with open(file, 'rb') as f:
+    #         data = pickle.load(f)
+    #     grid = data['grid']
+    #     grid[0] -= grid[0][0]
+    #     grid[1] -= grid[1][0]
+    #     grid[2] -= grid[2][0]
+    #     data['grid'] = grid.copy()
+    #     grid_net = grid
+    #     grid_net[0] += 0.025
+    #     grid_net[1] += 0.025
+    #     grid_net[2] += 0.02
+    #     data['net_grid'] = grid_net
+    #     with open(file, 'wb') as f:
+    #         pickle.dump(data, f)
     data_train_paths = data_train_paths[:train_len]
 
     n_cam = cfg.data.n_cam
@@ -94,8 +119,26 @@ def get_cloud_datasets(
         mask_type=cfg.ct_net.mask_type
     )
 
-
-    val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]
+    if dataset_name == 'CASS_10cams':
+        val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    elif dataset_name == 'BOMEX_10cams':
+        val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    else:
+        val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]
+    # for file in val_paths:
+    #     with open(file, 'rb') as f:
+    #         data = pickle.load(f)
+    #     grid = data['grid']
+    #     grid[0] -= grid[0][0]
+    #     grid[1] -= grid[1][0]
+    #     grid[2] -= grid[2][0]
+    #     data['grid'] = grid.copy()
+    #     grid_net = grid
+    #     grid_net[0] += 0.025
+    #     grid_net[1] += 0.025
+    #     grid_net[2] += 0.02
+    #     with open(file, 'wb') as f:
+    #         pickle.dump(data, f)
     val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
     val_paths = val_paths[:val_len]
     val_dataset = CloudDataset(val_paths, n_cam=n_cam,
@@ -127,7 +170,10 @@ class CloudDataset(Dataset):
             cam_i = torch.arange(self.n_cam)
         images = data['images'][cam_i]
         grid = data['net_grid']
-        image_sizes = data['image_sizes'][cam_i]
+        if hasattr(data, 'image_sizes'):
+            image_sizes = data['image_sizes'][cam_i]
+        else:
+            image_sizes = [image.shape for image in images]
         extinction = data['ext']
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]

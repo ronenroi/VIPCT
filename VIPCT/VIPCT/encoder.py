@@ -10,7 +10,7 @@ from .util import nn_util as util
 from .roi_align import ROIAlign
 # from model.custom_encoder import ConvEncoder
 import torch.autograd.profiler as profiler
-
+from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
 class Backbone(nn.Module):
     """
@@ -57,12 +57,31 @@ class Backbone(nn.Module):
         self.use_first_pool = use_first_pool
         norm_layer = util.get_norm_layer(norm_type)
         self.num_layers = num_layers
-
+        self.is_fpn = 'fpn' in backbone
         if self.use_custom_resnet:
             print("WARNING: Custom encoder is experimental only")
             print("Using simple convolutional encoder")
             self.model = ConvEncoder(3, norm_layer=norm_layer)
             self.latent_size = self.model.dims[-1]
+        elif self.is_fpn:
+            print("Using torchvision", backbone, "encoder")
+            extractor =  backbone.split('_')[0]
+            self.model = resnet_fpn_backbone(backbone_name=extractor,
+                pretrained=pretrained, norm_layer=norm_layer,trainable_layers=5)
+            if modify_first_layer:
+                self.model.body.conv1 = nn.Conv2d(1, self.model.body.conv1.out_channels, kernel_size=3,
+                                             stride=1, padding=1,
+                                             bias=self.model.body.conv1.bias != None)
+                self.samplers = [ROIAlign((sampling_support, sampling_support), 0.5 ** scale, 0) for scale in
+                                 range(5)]
+            else:
+                self.model.body.conv1 = nn.Conv2d(1, self.model.body.conv1.out_channels, kernel_size=self.model.body.conv1.kernel_size,
+                                             stride=self.model.body.conv1.stride, padding=self.model.body.conv1.padding,
+                                             bias=self.model.body.conv1.bias!=None)
+                self.samplers = [ROIAlign((sampling_support, sampling_support), 0.5 ** scale, 0) for scale in
+                                 range(1, 1 + self.num_layers)]
+            self.model.body.maxpool = nn.Sequential()
+
         else:
             print("Using torchvision", backbone, "encoder")
             self.model = getattr(torchvision.models, backbone)(
@@ -86,15 +105,19 @@ class Backbone(nn.Module):
             # Following 2 lines need to be uncommented for older cfgigs
             self.model.fc = nn.Sequential()
             self.model.avgpool = nn.Sequential()
-            self.sampling_support = sampling_support
-            if backbone=='resnet34':
-                self.latent_size = [0, 64, 128, 256, 512, 1024][num_layers]
-            elif backbone=='resnet50':
-                self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-            elif backbone=='resnet101':
-                self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-            else:
-                NotImplementedError()
+        self.sampling_support = sampling_support
+        if backbone=='resnet34':
+            self.latent_size = [0, 64, 128, 256, 512, 1024][num_layers]
+        elif backbone=='resnet50':
+            self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+        elif backbone=='resnet101':
+            self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+        elif backbone=='fasterrcnn_resnet50_fpn':
+            self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+        elif backbone=='resnet50_fpn':
+            self.latent_size = 256*5
+        else:
+            NotImplementedError()
         self.index_interp = index_interp
         self.index_padding = index_padding
         self.upsample_interp = upsample_interp
@@ -233,8 +256,9 @@ class Backbone(nn.Module):
         #     )
         # x = x.to(device=self.latent.device)
         input_size = torch.tensor(x.shape[-2:])
-        if self.use_custom_resnet:
+        if self.use_custom_resnet or self.is_fpn:
             latents = self.model(x)
+            latents = [v for k,v in latents.items()]
         else:
             x = self.model.conv1(x)
             x = self.model.bn1(x)

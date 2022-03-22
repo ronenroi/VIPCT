@@ -170,7 +170,8 @@ def main(cfg: DictConfig):
             #     R = torch.cat((R, cam.R), dim=0)
             #     T = torch.cat((T, cam.T), dim=0)
             # camera = PerspectiveCameras(device=device, R=R, T=T)
-
+            if torch.sum(torch.tensor([(mask).sum() if mask is not None else mask for mask in masks])) == 0:
+                continue
             optimizer.zero_grad()
 
             # Run the forward pass of the model.
@@ -238,6 +239,8 @@ def main(cfg: DictConfig):
                     masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
                     if model.val_mask_type == 'gt_mask':
                         masks = val_volume.extinctions > val_volume._ext_thr
+                    if torch.sum(torch.tensor([(mask).sum() if mask is not None else mask for mask in masks])) == 0:
+                        continue
                 # Activate eval mode of the model (lets us do a full rendering pass).
                     model.eval()
                     with torch.no_grad():

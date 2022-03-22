@@ -3,9 +3,9 @@ hydra:
     dir: ../test_results/${now:%Y-%m-%d}/${now:%H-%M-%S}
 seed: 3
 debug: False
-checkpoint_resume_path: 'outputs/2022-03-20_CASS/10-04-57/checkpoints/cp_30.pth'
+checkpoint_resume_path: 'outputs/2022-03-21_CASS_Res50_Sampl_3_modify_first_layer_F/22-52-23/checkpoints/cp_140.pth'
 data:
-  dataset_name: 'CASS_10cams'
+  dataset_name: 'BOMEX_10cams'
   image_size: [261, 261] # [height, width]
   n_val: -1
 visualization:
@@ -14,8 +14,7 @@ visualization:
   visdom_server: 'localhost'
   visdom_port: 8097
   visdom_env: 'nerf_pytorch3d'
-backbone:
-  modify_first_layer: False
+
 ct_net:
   val_n_query: 350
   val_mask_type: 'space_carving' # 'gt_mask' #'space_carving'  #'space_carving' 'gt_mask' None

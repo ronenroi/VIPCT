@@ -134,8 +134,8 @@ def main(cfg: DictConfig):
         with torch.no_grad():
             est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(
                 val_volume.extinctions.shape[0], -1)
-
-            if torch.sum(torch.stack(masks)*1.0) > 0:
+            n_points_mask = torch.sum(torch.stack(masks)*1.0) if isinstance(masks, list) else masks.sum()
+            if n_points_mask > 0:
                 val_out = model(
                     val_camera,
                     val_image,

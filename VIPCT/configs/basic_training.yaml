@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_CASS_Res50_Sampl_3_modify_first_layer_F/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_FPN_Sampl_3_modify_first_layer_T/${now:%H-%M-%S}
 seed: 3
 debug: False
 resume: False
@@ -42,13 +42,13 @@ ct_net:
   stop_encoder_grad: False
   dir_at_camera_coordinates: True
   norm_dir: False
-  mask_type: 'gt_mask'  #'space_carving' 'gt_mask' None
-  val_mask_type: 'gt_mask' #'space_carving'  #'space_carving' 'gt_mask' None
+  mask_type: 'space_carving'  #'space_carving' 'gt_mask' None
+  val_mask_type: 'space_carving' #'space_carving'  #'space_carving' 'gt_mask' None
   query_point_method: 'random' #'topk'
   query_point_val_method: 'all'
   feature_encoding: False
 backbone:
-  name: 'resnet50' #'resnet34'
+  name: 'resnet50_fpn' #'resnet34' fasterrcnn_resnet50_fpn
   pretrained: False
   num_layers: 4
   index_interp: 'bilinear'
@@ -58,7 +58,7 @@ backbone:
   use_first_pool: 'batch'
   sampling_support: 3
   feature_flatten: False
-  modify_first_layer: False
+  modify_first_layer: True
 decoder:
   name: 'FixCT' #'VIPCT' #'FixCT'
   average_cams: False

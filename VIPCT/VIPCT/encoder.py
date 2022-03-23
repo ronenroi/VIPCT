@@ -28,7 +28,8 @@ class Backbone(nn.Module):
             feature_scale=1.0,
             use_first_pool=True,
             norm_type="batch",
-            sampling_support=8,
+            sampling_output_size=8,
+            sampling_support = 8,
             to_flatten = False,
             modify_first_layer=True
     ):
@@ -49,9 +50,10 @@ class Backbone(nn.Module):
         """
         super().__init__()
 
+        assert sampling_output_size>0
         if norm_type != "batch":
             assert not pretrained
-
+        self.sampling_support = sampling_support
         self.use_custom_resnet = backbone == "custom"
         self.feature_scale = feature_scale
         self.use_first_pool = use_first_pool
@@ -72,14 +74,14 @@ class Backbone(nn.Module):
                 self.model.body.conv1 = nn.Conv2d(1, self.model.body.conv1.out_channels, kernel_size=3,
                                              stride=1, padding=1,
                                              bias=self.model.body.conv1.bias != None)
-                self.samplers = [ROIAlign((sampling_support, sampling_support), 0.5 ** scale, 0) for scale in
+                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
                                  range(5)]
             else:
                 self.model.body.conv1 = nn.Conv2d(1, self.model.body.conv1.out_channels, kernel_size=self.model.body.conv1.kernel_size,
                                              stride=self.model.body.conv1.stride, padding=self.model.body.conv1.padding,
                                              bias=self.model.body.conv1.bias!=None)
-                self.samplers = [ROIAlign((sampling_support, sampling_support), 0.5 ** scale, 0) for scale in
-                                 range(1, 1 + self.num_layers)]
+                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
+                                 range(5)]
             self.model.body.maxpool = nn.Sequential()
 
         else:
@@ -92,20 +94,20 @@ class Backbone(nn.Module):
                                              stride=1, padding=1,
                                              bias=self.model.conv1.bias!=None)
                 self.model.maxpool = nn.Sequential()
-                self.samplers = [ROIAlign((sampling_support, sampling_support), 0.5 ** scale, 0) for scale in
+                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
                                  [0,0,1,2]]
 
             else:
                 self.model.conv1 = nn.Conv2d(1, self.model.conv1.out_channels, kernel_size=self.model.conv1.kernel_size,
                                              stride=self.model.conv1.stride, padding=self.model.conv1.padding,
                                              bias=self.model.conv1.bias!=None)
-                self.samplers = [ROIAlign((sampling_support, sampling_support), 0.5 ** scale, 0) for scale in
+                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
                                  range(1, 1 + self.num_layers)]
 
             # Following 2 lines need to be uncommented for older cfgigs
             self.model.fc = nn.Sequential()
             self.model.avgpool = nn.Sequential()
-        self.sampling_support = sampling_support
+        self.sampling_output_size = sampling_output_size
         if backbone=='resnet34':
             self.latent_size = [0, 64, 128, 256, 512, 1024][num_layers]
         elif backbone=='resnet50':
@@ -122,7 +124,7 @@ class Backbone(nn.Module):
         self.index_padding = index_padding
         self.upsample_interp = upsample_interp
         self.to_flatten = to_flatten
-        self.net = nn.Linear(sampling_support*sampling_support,1, bias=True)
+        self.net = nn.Linear(sampling_output_size*sampling_output_size,1, bias=True)
             # nn.Sequential(nn.Conv2d(512,512,kernel_size=8,padding=0,bias=False),
             #                      nn.ReLU(inplace=True),
                                  # nn.MaxPool2d(2),
@@ -207,7 +209,7 @@ class Backbone(nn.Module):
         return samples #.transpose(2,3) # (B, Cams,points,features)
 
     def make_boxes(self, box_centers):
-        d = (self.sampling_support-1)/2
+        d = (self.sampling_support-1) / 2
         x1y1 = box_centers - d
         x2y2 = box_centers + d
         # boxes = list(torch.cat((x1y1,x2y2),dim=-1).view(-1,box_centers.shape[-2],4))
@@ -308,6 +310,7 @@ class Backbone(nn.Module):
             upsample_interp=cfg.backbone.upsample_interp,
             feature_scale=cfg.backbone.feature_scale,
             use_first_pool=cfg.backbone.use_first_pool,
+            sampling_output_size=cfg.backbone.sampling_output_size,
             sampling_support=cfg.backbone.sampling_support,
             to_flatten = cfg.backbone.feature_flatten,
             modify_first_layer = cfg.backbone.modify_first_layer

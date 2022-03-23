@@ -51,7 +51,7 @@ class CTnet(torch.nn.Module):
         n_hidden_neurons_dir = cfg.ct_net.n_hidden_neurons_dir
         n_layers_xyz = cfg.ct_net.n_layers_xyz
         n_layers_dir = cfg.ct_net.n_layers_dir
-        visualization = cfg.visualization.visdom
+        # visualization = cfg.visualization.visdom
         append_xyz = cfg.ct_net.append_xyz
         append_dir = cfg.ct_net.append_dir
         feature_encoding = cfg.ct_net.feature_encoding
@@ -64,7 +64,7 @@ class CTnet(torch.nn.Module):
         #                                              cfg.ct_net.n_harmonic_functions_dir)
         # self._chunk_size_test = chunk_size_test
         self._image_size = image_size
-        self.visualization = visualization
+        # self.visualization = visualization
         self.stop_encoder_grad = cfg.ct_net.stop_encoder_grad
         self.dir_at_camera_coordinates = cfg.ct_net.dir_at_camera_coordinates
         self.norm_dir = cfg.ct_net.norm_dir

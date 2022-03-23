@@ -1,33 +1,27 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_FPN_Sampl_3_modify_first_layer_T/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_FPN_Sampl_3_modify_first_layer_T_32cams/${now:%H-%M-%S}
 seed: 3
 debug: False
 resume: False
 stats_print_interval: 25
 validation_iter_interval: 2000
-checkpoint_epoch_interval: 10
-checkpoint_resume_path: 'outputs/2022-03-13/23-49-07/checkpoints/cp_410.pth'
+checkpoint_checkpoint_iteration_interval_interval: 10000
+checkpoint_resume_path: ''
 data:
   dataset_name: 'BOMEX_10cams' # 'satellites_images' CASS_10cams
   image_size: [261, 261] # [height, width]
   n_training: -1
   n_val: 20
-  n_cam: 10
+  n_cam: 32
   rand_cam: False
 optimizer:
   max_epochs: 100000
   lr: 0.0005
   batch_size: 1
-  iter_steps: [50000, 75000]
+  iter_steps: [150000, 300000]
   lr_scheduler_gamma: 0.1
   loss: 'L2_relative_error' #'L1_relative_error'
-visualization:
-  history_size: 10
-  visdom: False
-  visdom_server: 'localhost'
-  visdom_port: 8097
-  visdom_env: 'nerf_pytorch3d'
 ct_net:
   n_harmonic_functions_xyz: 3 #10
   n_harmonic_functions_dir: 2 #4
@@ -57,6 +51,7 @@ backbone:
   feature_scale: 1.0
   use_first_pool: 'batch'
   sampling_support: 3
+  sampling_output_size: 3
   feature_flatten: False
   modify_first_layer: True
 decoder:

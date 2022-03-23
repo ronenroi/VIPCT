@@ -142,6 +142,9 @@ def main(cfg: DictConfig):
     # err = torch.nn.L1Loss(reduction='sum')
     # Set the model to the training mode.
     model.train().float()
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         print(name)
     # Run the main training loop.
     iteration = -1
     if writer:
@@ -151,7 +154,7 @@ def main(cfg: DictConfig):
             iteration += 1
             if iteration % (cfg.stats_print_interval) == 0 and iteration > 0:
                 stats.new_epoch()  # Init a new epoch.
-            if epoch in cfg.optimizer.iter_steps:
+            if iteration in cfg.optimizer.iter_steps:
                 # Adjust the learning rate.
                 lr_scheduler.step()
 
@@ -293,11 +296,11 @@ def main(cfg: DictConfig):
 
             # Checkpoint.
         if (
-            epoch % cfg.checkpoint_epoch_interval == 0
+            iteration % cfg.checkpoint_iteration_interval == 0
             and len(checkpoint_dir) > 0
-            and epoch > 0
+            and iteration > 0
         ):
-            curr_checkpoint_path = os.path.join(checkpoint_dir,f'cp_{epoch}.pth')
+            curr_checkpoint_path = os.path.join(checkpoint_dir,f'cp_{iteration}.pth')
             print(f"Storing checkpoint {curr_checkpoint_path}.")
             data_to_store = {
                 "model": model.state_dict(),

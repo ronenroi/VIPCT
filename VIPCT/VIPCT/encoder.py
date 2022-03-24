@@ -117,7 +117,7 @@ class Backbone(nn.Module):
         elif backbone=='fasterrcnn_resnet50_fpn':
             self.latent_size = [0, 64, 320, 832, 1856][num_layers]
         elif backbone=='resnet50_fpn':
-            self.latent_size = 256*5
+            self.latent_size = 256*4 # 256*5
         else:
             NotImplementedError()
         self.index_interp = index_interp
@@ -260,6 +260,7 @@ class Backbone(nn.Module):
         input_size = torch.tensor(x.shape[-2:])
         if self.use_custom_resnet or self.is_fpn:
             latents = self.model(x)
+            del latents['pool']
             latents = [v for k,v in latents.items()]
         else:
             x = self.model.conv1(x)

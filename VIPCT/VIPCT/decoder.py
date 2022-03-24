@@ -54,6 +54,51 @@ class Decoder(nn.Module):
                 torch.nn.ReLU(True),
                 linear4
             )
+        elif type == 'FixCTv2':
+            linear1 = torch.nn.Linear(latent_size, 2048)
+            linear2 = torch.nn.Linear(2048, 512)
+            linear3 = torch.nn.Linear(512, 64)
+            linear4 = torch.nn.Linear(64, 1)
+            _xavier_init(linear1)
+            _xavier_init(linear2)
+            _xavier_init(linear3)
+            _xavier_init(linear4)
+
+            self.decoder = torch.nn.Sequential(
+                linear1,
+                torch.nn.LayerNorm(2048),
+                torch.nn.ReLU(True),
+                linear2,
+                torch.nn.LayerNorm(512),
+                torch.nn.ReLU(True),
+                linear3,
+                torch.nn.LayerNorm(64),
+                torch.nn.ReLU(True),
+                linear4
+            )
+        elif type == 'FixCTv3':
+            linear1 = torch.nn.Linear(latent_size, 2048)
+            linear2 = torch.nn.Linear(2048, 512)
+            linear3 = torch.nn.Linear(512, 64)
+            linear4 = torch.nn.Linear(64, 1)
+            _xavier_init(linear1)
+            _xavier_init(linear2)
+            _xavier_init(linear3)
+            _xavier_init(linear4)
+            nn.init.constant_(linear4.bias.data, 10)
+
+            self.decoder = torch.nn.Sequential(
+                linear1,
+                torch.nn.LayerNorm(2048),
+                torch.nn.ReLU(True),
+                linear2,
+                torch.nn.LayerNorm(512),
+                torch.nn.ReLU(True),
+                linear3,
+                torch.nn.LayerNorm(64),
+                torch.nn.ReLU(True),
+                linear4
+            )
         elif type == 'VIPCT':
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)

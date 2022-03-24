@@ -82,11 +82,17 @@ def get_cloud_datasets(
     dataset_name = cfg.data.dataset_name
     if dataset_name == 'CASS_10cams':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
+        image_size = [236, 236]
     elif dataset_name == 'BOMEX_10cams':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256')
+        image_size = [116, 116]
+    elif dataset_name == 'BOMEX_32cams':
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256')
+        image_size = [116, 116]
     else:
         data_root = os.path.join(data_root,'BOMEX_256x256x100_5000CCN_50m_micro_256/roi',dataset_name)
-    image_size = cfg.data.image_size
+        image_size = [236, 236]
+    # image_size = cfg.data.image_size
     if dataset_name not in ALL_DATASETS:
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 

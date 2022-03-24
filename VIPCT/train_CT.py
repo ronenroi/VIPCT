@@ -26,9 +26,12 @@ def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
 
+
     # Device on which to run.
     if torch.cuda.is_available() and cfg.debug == False:
-        device = "cuda"
+        n_device = torch.cuda.device_count()
+        cfg.gpu = 0 if n_device==1 else cfg.gpu
+        device = f"cuda:{cfg.gpu}"
     else:
         warnings.warn(
             "Please note that although executing on CPU is supported,"
@@ -78,6 +81,11 @@ def main(cfg: DictConfig):
         model.parameters(),
         lr=cfg.optimizer.lr,
     )
+
+    # optimizer = torch.optim.AdamW(
+    #     model.parameters(),
+    #     lr=cfg.optimizer.lr,
+    # )
 
     # Load the optimizer state dict in case we are resuming.
     if optimizer_state_dict is not None:
@@ -187,7 +195,9 @@ def main(cfg: DictConfig):
 
             # The loss is a sum of coarse and fine MSEs
             if cfg.optimizer.loss == 'L2_relative_error':
-                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/torch.norm(ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())**2 / ext_gt.shape[0] / + 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'L2':
+                loss = [err(ext_est.squeeze(),ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L1_relative_error':
                 loss = [relative_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             else:
@@ -263,7 +273,12 @@ def main(cfg: DictConfig):
                         assert len(est_vols)==1 ##TODO support validation with batch larger than 1
                         gt_vol = val_volume.extinctions[0].squeeze()
                         est_vols = est_vols.squeeze()
-                        loss_val += err(est_vols, gt_vol)
+                        if cfg.optimizer.loss == 'L2_relative_error':
+                            loss_val += err(est_vols.squeeze(), gt_vol.squeeze()) / (torch.norm(gt_vol.squeeze())**2 / gt_vol.shape[0] + 1e-2)
+                        elif cfg.optimizer.loss == 'L2':
+                            loss_val += err(est_vols.squeeze(), gt_vol.squeeze())
+                        elif cfg.optimizer.loss == 'L1_relative_error':
+                            loss_val += relative_error(ext_est=est_vols,ext_gt=gt_vol)
                         # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
 
                         relative_err += relative_error(ext_est=est_vols,ext_gt=gt_vol)#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
@@ -294,20 +309,20 @@ def main(cfg: DictConfig):
                 # Set the model back to train mode.
                 model.train()
 
-            # Checkpoint.
-        if (
-            iteration % cfg.checkpoint_iteration_interval == 0
-            and len(checkpoint_dir) > 0
-            and iteration > 0
-        ):
-            curr_checkpoint_path = os.path.join(checkpoint_dir,f'cp_{iteration}.pth')
-            print(f"Storing checkpoint {curr_checkpoint_path}.")
-            data_to_store = {
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "stats": pickle.dumps(stats),
-            }
-            torch.save(data_to_store, curr_checkpoint_path)
+                # Checkpoint.
+            if (
+                iteration % cfg.checkpoint_iteration_interval == 0
+                and len(checkpoint_dir) > 0
+                and iteration > 0
+            ):
+                curr_checkpoint_path = os.path.join(checkpoint_dir,f'cp_{iteration}.pth')
+                print(f"Storing checkpoint {curr_checkpoint_path}.")
+                data_to_store = {
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "stats": pickle.dumps(stats),
+                }
+                torch.save(data_to_store, curr_checkpoint_path)
 
 
 if __name__ == "__main__":

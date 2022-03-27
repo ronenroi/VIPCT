@@ -43,7 +43,7 @@ class CTnet(torch.nn.Module):
 
 
         # Parse out image dimensions.
-        image_size = cfg.data.image_size
+        # image_size = cfg.data.image_size
         # chunk_size_test = cfg.raysampler.chunk_size_test
         # n_harmonic_functions_xyz = cfg.ct_net.n_harmonic_functions_xyz
         # n_harmonic_functions_dir = cfg.ct_net.n_harmonic_functions_dir
@@ -63,7 +63,7 @@ class CTnet(torch.nn.Module):
         # self.harmonic_embedding = PositionalEncoding(cfg.ct_net.n_harmonic_functions_xyz,
         #                                              cfg.ct_net.n_harmonic_functions_dir)
         # self._chunk_size_test = chunk_size_test
-        self._image_size = image_size
+        # self._image_size = image_size
         # self.visualization = visualization
         self.stop_encoder_grad = cfg.ct_net.stop_encoder_grad
         self.dir_at_camera_coordinates = cfg.ct_net.dir_at_camera_coordinates

@@ -29,7 +29,7 @@ if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/D
 
 # DEFAULT_URL_ROOT = "https://dl.fbaipublicfiles.com/pytorch3d_nerf_data"
 
-ALL_DATASETS = ("satellites_images", "dom_satellites_images", "CASS_10cams", "BOMEX_10cams")
+ALL_DATASETS = ("satellites_images", "dom_satellites_images", "CASS_10cams", "BOMEX_10cams", "BOMEX_32cams")
 
 
 def trivial_collate(batch):
@@ -80,21 +80,24 @@ def get_cloud_datasets(
         test_dataset: The testing dataset object.
     """
     dataset_name = cfg.data.dataset_name
+
+    if dataset_name not in ALL_DATASETS:
+        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
+
     if dataset_name == 'CASS_10cams':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
         image_size = [236, 236]
     elif dataset_name == 'BOMEX_10cams':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras')
         image_size = [116, 116]
     elif dataset_name == 'BOMEX_32cams':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras')
         image_size = [116, 116]
     else:
         data_root = os.path.join(data_root,'BOMEX_256x256x100_5000CCN_50m_micro_256/roi',dataset_name)
         image_size = [236, 236]
     # image_size = cfg.data.image_size
-    if dataset_name not in ALL_DATASETS:
-        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
+
 
     print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
     data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
@@ -127,7 +130,7 @@ def get_cloud_datasets(
 
     if dataset_name == 'CASS_10cams':
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    elif dataset_name == 'BOMEX_10cams':
+    elif dataset_name == 'BOMEX_10cams' or dataset_name == 'BOMEX_32cams':
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
     else:
         val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]

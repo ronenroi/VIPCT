@@ -15,7 +15,7 @@ from omegaconf import DictConfig
 import torch
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
-mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_est.view(-1),p=1) - torch.norm(ext_gt.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
+mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
 
@@ -80,6 +80,7 @@ def main(cfg: DictConfig):
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=cfg.optimizer.lr,
+        weight_decay=cfg.optimizer.wd,
     )
 
     # optimizer = torch.optim.AdamW(
@@ -194,8 +195,10 @@ def main(cfg: DictConfig):
             )
 
             # The loss is a sum of coarse and fine MSEs
-            if cfg.optimizer.loss == 'L2_relative_error':
+            if cfg.optimizer.loss == 'L2_relative_error_new':
                 loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())**2 / ext_gt.shape[0] / + 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'L2_relative_error':
+                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())+ 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L2':
                 loss = [err(ext_est.squeeze(),ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L1_relative_error':

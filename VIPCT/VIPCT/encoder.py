@@ -10,8 +10,8 @@ from .util import nn_util as util
 from .roi_align import ROIAlign
 # from model.custom_encoder import ConvEncoder
 import torch.autograd.profiler as profiler
-from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
-
+# from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
+from .MyResNetFPN import resnet_fpn_backbone
 class Backbone(nn.Module):
     """
     2D (Spatial/Pixel-aligned/local) image encoder
@@ -30,6 +30,8 @@ class Backbone(nn.Module):
             norm_type="batch",
             sampling_output_size=8,
             sampling_support = 8,
+            out_channels = 256,
+            n_sampling_nets=1,
             to_flatten = False,
             modify_first_layer=True
     ):
@@ -69,7 +71,7 @@ class Backbone(nn.Module):
             print("Using torchvision", backbone, "encoder")
             extractor =  backbone.split('_')[0]
             self.model = resnet_fpn_backbone(backbone_name=extractor,
-                pretrained=pretrained, norm_layer=norm_layer,trainable_layers=5)
+                pretrained=pretrained, norm_layer=norm_layer, out_channels=out_channels, trainable_layers=5)
             if modify_first_layer:
                 self.model.body.conv1 = nn.Conv2d(1, self.model.body.conv1.out_channels, kernel_size=3,
                                              stride=1, padding=1,
@@ -117,60 +119,17 @@ class Backbone(nn.Module):
         elif backbone=='fasterrcnn_resnet50_fpn':
             self.latent_size = [0, 64, 320, 832, 1856][num_layers]
         elif backbone=='resnet50_fpn':
-            self.latent_size = 256*4 # 256*5
+            self.latent_size = out_channels*4 # 256*5
         else:
             NotImplementedError()
         self.index_interp = index_interp
         self.index_padding = index_padding
         self.upsample_interp = upsample_interp
         self.to_flatten = to_flatten
-        self.net = nn.Linear(sampling_output_size*sampling_output_size,1, bias=True)
-            # nn.Sequential(nn.Conv2d(512,512,kernel_size=8,padding=0,bias=False),
-            #                      nn.ReLU(inplace=True),
-                                 # nn.MaxPool2d(2),
-                                 # nn.Conv2d(512, 512, kernel_size=3, padding=1, bias=False),
-                                 # nn.ReLU(inplace=True),
-                                 # nn.MaxPool2d(2),
-                                 # nn.Conv2d(512, 512, kernel_size=3, padding=1, bias=False),
-                                 # nn.ReLU(inplace=True),
-                                 # nn.MaxPool2d(2),
-                                 # )
 
-        # self.register_buffer("latent", torch.empty(1, 1, 1, 1), persistent=False)
-        # self.register_buffer(
-        #     "latent_scaling", torch.empty(2, dtype=torch.float32), persistent=False
-        # )
-        # self.latent (B, L, H, W)
+        self.net = nn.Linear(sampling_output_size * sampling_output_size, 1, bias=True) if n_sampling_nets==1\
+            else Sampling_Weighting(sampling_output_size,n_sampling_nets)
 
-    # def sample_images_old(self, latent, uv, image_size=()):
-    #     """
-    #     Get pixel-aligned image features at 2D image coordinates
-    #     :param latent (B, C, H, W) images features
-    #     :param uv (B, N, 2) image points (x,y)
-    #     :param image_size image size, either (width, height) or single int.
-    #     if not specified, assumes coords are in [-1, 1]
-    #     :return (B, C, N) L is latent size
-    #     """
-    #     with profiler.record_function("encoder_index"):
-    #         if uv.shape[0] == 1 and latent.shape[0] > 1:
-    #             uv = uv.expand(latent.shape[0], -1, -1)
-    #
-    #         with profiler.record_function("encoder_index_pre"):
-    #             if len(image_size) > 0:
-    #                 if len(image_size) == 1:
-    #                     image_size = (image_size, image_size)
-    #                 scale = self.latent_scaling / image_size
-    #                 uv = uv * scale - 1.0
-    #
-    #         uv = uv.unsqueeze(2)  # (B, N, 1, 2)
-    #         samples = F.grid_sample(
-    #             latent,
-    #             uv,
-    #             align_corners=True,
-    #             mode=self.index_interp,
-    #             padding_mode=self.index_padding,
-    #         )
-    #         return samples[:, :, :, 0]  # (B, C, N)
     def sample_roi(self, latents, box_centers):
         """
         Get pixel-aligned image features at 2D image coordinates
@@ -195,6 +154,8 @@ class Backbone(nn.Module):
             samples = torch.cat((samples, roi_features),dim=1)
 
         samples = [torch.squeeze(self.net(samples.reshape(samples.shape[0],samples.shape[1],-1)),-1).reshape(*box_centers.shape[:2],-1)]
+
+
         # samples = [torch.squeeze(self.net(samples.reshape(samples.shape[0],samples.shape[1],-1)),-1)]
         # chuncks =  [box.shape[0] for box in boxes]
         # samples = torch.split(samples,chuncks)
@@ -248,15 +209,7 @@ class Backbone(nn.Module):
         :param x image (B, C, H, W)
         :return latent (B, latent_size, H, W)
         """
-        # if self.feature_scale != 1.0:
-        #     x = F.interpolate(
-        #         x,
-        #         scale_factor=self.feature_scale,
-        #         mode="bilinear" if self.feature_scale > 1.0 else "area",
-        #         align_corners=True if self.feature_scale > 1.0 else None,
-        #         recompute_scale_factor=True,
-        #     )
-        # x = x.to(device=self.latent.device)
+
         input_size = torch.tensor(x.shape[-2:])
         if self.use_custom_resnet or self.is_fpn:
             latents = self.model(x)
@@ -283,20 +236,6 @@ class Backbone(nn.Module):
                 x = self.model.layer4(x)
                 latents.append(x)
 
-            # latents = latents
-            # align_corners = None if self.index_interp == "nearest " else True
-            # latent_sz = latents[0].shape[-2:]
-            # for i in range(len(latents)):
-            #     latents[i] = F.interpolate(
-            #         latents[i],
-            #         latent_sz,
-            #         mode=self.upsample_interp,
-            #         align_corners=align_corners,
-            #     )
-            # latent = torch.cat(latents, dim=1)
-        # self.latent_scaling[0] = latent.shape[-1]
-        # self.latent_scaling[1] = latent.shape[-2]
-        # self.latent_scaling = self.latent_scaling / (self.latent_scaling - 1) * 2.0 #self.latent_scaling / (self.latent_scaling - 1) * 2.0
         self.latent_scaling = [(torch.tensor(latent.shape[-2:]) / input_size).to(device=x.device) for latent in latents]
         # return latent
         return latents
@@ -313,6 +252,8 @@ class Backbone(nn.Module):
             use_first_pool=cfg.backbone.use_first_pool,
             sampling_output_size=cfg.backbone.sampling_output_size,
             sampling_support=cfg.backbone.sampling_support,
+            out_channels = cfg.backbone.out_channels,
+            n_sampling_nets = cfg.backbone.n_sampling_nets,
             to_flatten = cfg.backbone.feature_flatten,
             modify_first_layer = cfg.backbone.modify_first_layer
         )
@@ -472,3 +413,24 @@ class ConvEncoder(nn.Module):
         x = self.deconv_last(x)
         x = util.same_unpad_deconv2d(x, layer=self.deconv_last)
         return x
+
+
+class Sampling_Weighting(nn.Module):
+    def __init__(
+        self,
+        sampling_output_size=3,
+        n_sampling_nets=1,
+    ):
+        super(Sampling_Weighting, self).__init__()
+        self.n_sampling_nets = n_sampling_nets
+        self.model = nn.ModuleList([nn.Linear(sampling_output_size * sampling_output_size, 1, bias=True)]*n_sampling_nets)
+
+
+    def forward(self, x):
+        if self.n_sampling_nets==1:
+            return self.model[0](x)
+        else:
+            x = x.reshape(self.n_sampling_nets,-1,x.shape[-2],x.shape[-1])
+            x = [net(b) for b, net in zip(x,self.model)]
+            x = torch.vstack(x)
+            return x

@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 from omegaconf import DictConfig
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
-mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_est.view(-1),p=1) - torch.norm(ext_gt.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
+mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
 @hydra.main(config_path=CONFIG_DIR, config_name="basic_test")
@@ -116,6 +116,7 @@ def main(cfg: DictConfig):
     loss_val = 0
     relative_err= []
     relative_mass_err = []
+    batch_time_net = []
     val_i = 0
     for val_i, val_batch in enumerate(val_dataloader):
 
@@ -136,6 +137,8 @@ def main(cfg: DictConfig):
                 val_volume.extinctions.shape[0], -1)
             n_points_mask = torch.sum(torch.stack(masks)*1.0) if isinstance(masks, list) else masks.sum()
             if n_points_mask > 0:
+                net_start_time = time.time()
+
                 val_out = model(
                     val_camera,
                     val_image,
@@ -152,7 +155,9 @@ def main(cfg: DictConfig):
                 else:
                     for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
                         est_vol[m]=out_vol.squeeze(1)#.reshape(m.shape)[m]
-
+                time_net = time.time() - net_start_time
+            else:
+                time_net = 0
             assert len(est_vols)==1 ##TODO support validation with batch larger than 1
 
             if False:
@@ -173,6 +178,7 @@ def main(cfg: DictConfig):
             #     print()
             relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            batch_time_net.append(time_net)
             if writer:
                 writer._iter = iteration
                 writer._dataset = 'val'  # .format(val_i)
@@ -184,7 +190,7 @@ def main(cfg: DictConfig):
     loss_val /= (val_i + 1)
     relative_err = np.array(relative_err)
     relative_mass_err =np.array(relative_mass_err)
-
+    batch_time_net = np.array(batch_time_net)
     print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
     relative_err1 = relative_err[relative_err<2]
     print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
@@ -192,6 +198,8 @@ def main(cfg: DictConfig):
     print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
     relative_mass_err1 = relative_mass_err[relative_mass_err<2]
     print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
+
+    print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')
     if writer:
         writer._iter = iteration
         writer._dataset = 'val'#.format(val_i)

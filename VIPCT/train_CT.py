@@ -13,6 +13,7 @@ from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
+# from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
@@ -112,10 +113,11 @@ def main(cfg: DictConfig):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lr_lambda, last_epoch=start_epoch - 1, verbose=False
     )
-
-
-
-
+    # lr_scheduler = create_lr_scheduler_with_warmup(
+    #     lr_scheduler,
+    #     warmup_start_value=cfg.optimizer.lr/100,
+    #     warmup_duration=5000,
+    #     warmup_end_value=cfg.optimizer.lr)
 
     # if cfg.data.precache_rays:
     #     # Precache the projection rays.
@@ -161,6 +163,7 @@ def main(cfg: DictConfig):
     for epoch in range(start_epoch, cfg.optimizer.max_epochs):
         for i, batch in enumerate(train_dataloader):
             iteration += 1
+            # lr_scheduler(None)
             if iteration % (cfg.stats_print_interval) == 0 and iteration > 0:
                 stats.new_epoch()  # Init a new epoch.
             if iteration in cfg.optimizer.iter_steps:
@@ -196,7 +199,7 @@ def main(cfg: DictConfig):
 
             # The loss is a sum of coarse and fine MSEs
             if cfg.optimizer.loss == 'L2_relative_error_new':
-                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())**2 / ext_gt.shape[0] / + 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())**2 / (ext_gt.shape[0]+1e-2) / + 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L2_relative_error':
                 loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())+ 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L2':
@@ -221,7 +224,7 @@ def main(cfg: DictConfig):
 
             # Update stats with the current metrics.
             stats.update(
-                {"loss": float(loss), "relative_error": float(relative_err), "lr": lr_scheduler.get_last_lr()[0],
+                {"loss": float(loss), "relative_error": float(relative_err), "lr":  lr_scheduler.get_last_lr()[0],#optimizer.param_groups[0]['lr'],#lr_scheduler.get_last_lr()[0]
                  "max_memory": float(round(torch.cuda.max_memory_allocated()/1e6))},
                 stat_set="train",
             )

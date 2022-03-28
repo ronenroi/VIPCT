@@ -176,6 +176,7 @@ class Backbone(nn.Module):
         # boxes = list(torch.cat((x1y1,x2y2),dim=-1).view(-1,box_centers.shape[-2],4))
         boxes = torch.cat((x1y1,x2y2),dim=-1).view(-1,4)
         return boxes
+
     def sample_features(self, latents, uv):
         """
         Get pixel-aligned image features at 2D image coordinates

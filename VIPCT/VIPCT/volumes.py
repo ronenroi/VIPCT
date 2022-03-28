@@ -154,6 +154,7 @@ class Volumes:
 
         query_points = self.get_coord_grid()
         ext = self.extinctions.reshape(self.extinctions.shape[0], -1)
+        indices = None
         if masks is not None:
             ext = [e[m.reshape(-1)] if m is not None else e for e, m in zip(ext, masks)]
             query_points = [points[m.reshape(-1),:] if m is not None else points for points, m in zip(query_points, masks)]
@@ -167,49 +168,29 @@ class Volumes:
             indices = [torch.randperm(e.shape[0])[:n_query if n_query < e.shape[0] else e.shape[0]] for e in ext]
             ext = [vol[index] for vol, index in zip(ext, indices)]
             query_points = [points[index, :] for points, index in zip(query_points, indices)]
+        elif method == 'random_bins':
+            ext_points = [torch.hstack((e[...,None],points)) for e, points in zip(ext,query_points)]
+            ext_points = [e[torch.argsort(e[:,0])].chunk(5) for e in ext_points]
+            n_query_split = int(n_query/5)
+            for i, e in enumerate(ext_points):
+                ind = [torch.randperm(e_split.shape[0])[:n_query_split if n_query_split < e_split.shape[0] else e_split.shape[0]] for e_split in e]
+                e = torch.vstack([vol[index] for vol, index in zip(e, ind)])
+                ext[i] = torch.squeeze(e[:,0])
+                query_points[i] = torch.squeeze(e[:,1:])
+
         elif method == 'all':
             # ext = torch.stack(ext)
             # query_points = torch.stack(query_points)
             # ext = list(ext)
             indices = None
-            pass
 
         else:
             NotImplementedError()
         return ext, query_points, indices
+
     def __len__(self) -> int:
         return self._extinctions.shape[0]
 
-    # def __getitem__(
-    #     self, index: Union[int, List[int], Tuple[int], slice, torch.Tensor]
-    # ) -> "Volumes":
-    #     """
-    #     Args:
-    #         index: Specifying the index of the volume to retrieve.
-    #             Can be an int, slice, list of ints or a boolean or a long tensor.
-    #
-    #     Returns:
-    #         Volumes object with selected volumes. The tensors are not cloned.
-    #     """
-    #     if isinstance(index, int):
-    #         index = torch.LongTensor([index])
-    #     elif isinstance(index, (slice, list, tuple)):
-    #         pass
-    #     elif torch.is_tensor(index):
-    #         if index.dim() != 1 or index.dtype.is_floating_point:
-    #             raise IndexError(index)
-    #     else:
-    #         raise IndexError(index)
-    #
-    #     new = self.__class__(
-    #         # pyre-fixme[16]: `Optional` has no attribute `__getitem__`.
-    #         features=self.features()[index] if self._features is not None else None,
-    #         extinctions=self.extinctions()[index],
-    #     )
-    #     # dont forget to update grid_sizes!
-    #     new._grid_sizes = self.get_grid_sizes()[index]
-    #     new._local_to_world_transform = self._local_to_world_transform[index]
-    #     return new
     @property
     def extinctions(self) -> torch.Tensor:
         """

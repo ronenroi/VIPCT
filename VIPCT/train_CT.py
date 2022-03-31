@@ -204,6 +204,11 @@ def main(cfg: DictConfig):
                 loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())+ 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L2':
                 loss = [err(ext_est.squeeze(),ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'L2_Weighted':
+                weights = torch.ones(27,device=device)
+                weights[:13] /= 5
+                weights[14:] /= 5
+                loss = [err(ext_est.squeeze()*weights,ext_gt.squeeze()*weights) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'L1_relative_error':
                 loss = [relative_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             else:
@@ -217,6 +222,9 @@ def main(cfg: DictConfig):
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
             optimizer.step()
             with torch.no_grad():
+                if cfg.ct_net.use_neighbours:
+                    out["output"] = [ext_est.reshape(-1,3,3,3)[:,1,1,1] for ext_est in out["output"]]
+                    out["volume"] = [ext_gt.reshape(-1, 3, 3, 3)[:, 1, 1, 1] for ext_gt in out["volume"]]
                 relative_err = [relative_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]#torch.norm(out["output"] - out["volume"],p=1,dim=-1) / (torch.norm(out["volume"],p=1,dim=-1) + 1e-6)
                 relative_err = torch.tensor(relative_err).mean()
                 relative_mass_err = [mass_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]#(torch.norm(out["output"],p=1,dim=-1) - torch.norm(out["volume"],p=1,dim=-1)) / (torch.norm(out["volume"],p=1,dim=-1) + 1e-6)
@@ -270,6 +278,8 @@ def main(cfg: DictConfig):
                             masks
                         )
                         est_vols = torch.zeros(torch.squeeze(val_volume.extinctions,1).shape, device=val_volume.device)
+                        if cfg.ct_net.use_neighbours:
+                            val_out["output"] = [ext_est.reshape(-1, 3, 3, 3)[:, 1, 1, 1].unsqueeze(-1) for ext_est in val_out["output"]]
                         if val_out['query_indices'] is None:
                             for i, (out_vol, m) in enumerate(zip(val_out["output"], masks)):
                                 est_vols[i][m.squeeze(0)] = out_vol.squeeze(1)

@@ -188,6 +188,49 @@ class Volumes:
             NotImplementedError()
         return ext, query_points, indices
 
+    def get_query_points_and_neighbours(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
+
+        query_points = self.get_coord_grid()
+        ext = torch.nn.functional.pad(self.extinctions, (1,1,1,1,1,1), 'constant', 0)
+        ext = ext.unfold(4, 3, 1).unfold(3, 3, 1).unfold(2, 3, 1)
+
+        # torch.nn.functional.pad(self.extinctions, 1, 'constant', 0)
+        # torch.functional.
+        ext = ext.reshape(ext.shape[0], -1,3,3,3)
+        indices = None
+        if masks is not None:
+            ext = [e[m.reshape(-1),...] if m is not None else e for e, m in zip(ext, masks)]
+            query_points = [points[m.reshape(-1),:] if m is not None else points for points, m in zip(query_points, masks)]
+
+        if method == 'topk':
+            indices = [torch.topk(e[:,1,1,1], n_query if n_query < e.shape[0] else e.shape[0]).indices for e in ext]
+            ext = [vol[index,...] for vol, index in zip(ext, indices)]
+            query_points = [points[index, :] for points, index in zip(query_points, indices)]
+        elif method == 'random':
+            indices = [torch.randperm(e.shape[0])[:n_query if n_query < e.shape[0] else e.shape[0]] for e in ext]
+            ext = [vol[index,...] for vol, index in zip(ext, indices)]
+            query_points = [points[index, :] for points, index in zip(query_points, indices)]
+        # elif method == 'random_bins':
+        #     ext_points = [torch.hstack((e[...,None],points)) for e, points in zip(ext,query_points)]
+        #     ext_points = [e[torch.argsort(e[:,0])].chunk(5) for e in ext_points]
+        #     n_query_split = int(n_query/5)
+        #     for i, e in enumerate(ext_points):
+        #         ind = [torch.randperm(e_split.shape[0])[:n_query_split if n_query_split < e_split.shape[0] else e_split.shape[0]] for e_split in e]
+        #         e = torch.vstack([vol[index] for vol, index in zip(e, ind)])
+        #         ext[i] = torch.squeeze(e[:,0])
+        #         query_points[i] = torch.squeeze(e[:,1:])
+
+        elif method == 'all':
+            # ext = torch.stack(ext)
+            # query_points = torch.stack(query_points)
+            # ext = list(ext)
+            indices = None
+
+        else:
+            NotImplementedError()
+        ext = [vol.reshape(-1,27) for vol in ext]
+        return ext, query_points, indices
+
     def __len__(self) -> int:
         return self._extinctions.shape[0]
 

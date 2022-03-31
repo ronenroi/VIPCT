@@ -6,6 +6,7 @@ from .util import nn_util as util
 from .roi_align import ROIAlign
 # from model.custom_encoder import ConvEncoder
 import torch.autograd.profiler as profiler
+from .mlp_function import MLPWithInputSkips2
 
 
 def _xavier_init(linear):
@@ -26,6 +27,7 @@ class Decoder(nn.Module):
             feature_flatten,
             n_cam,
             latent_size,
+            use_neighbours,
     ):
         """
         :param type Decoder network type.
@@ -33,11 +35,13 @@ class Decoder(nn.Module):
         super().__init__()
         self.average_cams = average_cams
         self.feature_flatten = feature_flatten
+        out_size = 27 if use_neighbours else 1
+        self.type = type
         if type == 'FixCT':
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)
             linear3 = torch.nn.Linear(512, 64)
-            linear4 = torch.nn.Linear(64, 1)
+            linear4 = torch.nn.Linear(64, out_size)
             _xavier_init(linear1)
             _xavier_init(linear2)
             _xavier_init(linear3)
@@ -58,7 +62,7 @@ class Decoder(nn.Module):
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)
             linear3 = torch.nn.Linear(512, 64)
-            linear4 = torch.nn.Linear(64, 1)
+            linear4 = torch.nn.Linear(64, out_size)
             _xavier_init(linear1)
             _xavier_init(linear2)
             _xavier_init(linear3)
@@ -80,7 +84,7 @@ class Decoder(nn.Module):
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)
             linear3 = torch.nn.Linear(512, 64)
-            linear4 = torch.nn.Linear(64, 1)
+            linear4 = torch.nn.Linear(64, out_size)
             _xavier_init(linear1)
             _xavier_init(linear2)
             _xavier_init(linear3)
@@ -99,11 +103,26 @@ class Decoder(nn.Module):
                 torch.nn.ReLU(True),
                 linear4
             )
+        elif type == 'FixCTv4':
+
+            self.decoder = nn.Sequential(
+                torch.nn.Linear(latent_size, 2048),
+                torch.nn.ReLU(True),
+                MLPWithInputSkips2(
+                8,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                512,
+                input_skips=(5,),
+
+            ),
+            torch.nn.Linear(512, out_size))
+
         elif type == 'VIPCT':
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)
             linear3 = torch.nn.Linear(512, 64)
-            linear4 = torch.nn.Linear(64, 1)
+            linear4 = torch.nn.Linear(64, out_size)
             _xavier_init(linear1)
             _xavier_init(linear2)
             _xavier_init(linear3)
@@ -125,15 +144,16 @@ class Decoder(nn.Module):
         if self.average_cams:
             x = torch.mean(x,1)
         if self.feature_flatten:
-            x = x.view(x.shape[0],-1)
+            x = x.reshape(x.shape[0],-1)
         return self.decoder(x)
 
     @classmethod
-    def from_cfg(cls, cfg, latent_size):
+    def from_cfg(cls, cfg, latent_size, use_neighbours=False):
         return cls(
             type = cfg.decoder.name,
             average_cams=cfg.decoder.average_cams,
             feature_flatten=cfg.decoder.feature_flatten,
             n_cam = cfg.data.n_cam,
             latent_size = latent_size,
+            use_neighbours = use_neighbours,
         )

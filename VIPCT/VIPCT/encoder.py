@@ -169,6 +169,33 @@ class Backbone(nn.Module):
         # samples = self.net(samples.reshape(samples.shape[0],samples.shape[1],-1)).reshape(*box_centers.shape[:-1],-1)
         return samples #.transpose(2,3) # (B, Cams,points,features)
 
+    def sample_roi_debug(self, latents, box_centers):
+        """
+        Get pixel-aligned image features at 2D image coordinates
+        :param latent (B, C, H, W) images features
+        :param box_center (B, N, 2) box center in pixels (x,y)
+        :return (B, C, N) L is latent size
+        """
+        # if uv.shape[0] == 1 and latents.shape[0] > 1:
+        #     uv = uv.expand(latents.shape[0], -1, -1)
+        # image_size = torch.tensor(image_size, device=uv.device)
+        # m = (image_size -1) / 2
+        # uv /= m
+        # uv -= 1
+
+        assert len(box_centers)==1
+        box_centers = box_centers[0]
+        boxes = [self.make_boxes(box_center) for box_center in box_centers]
+        samples = torch.empty(0,device=latents[0].device)
+        for latent, sampler in zip(latents, self.samplers):
+            latent = latent.view(-1,*latent.shape[2:])
+            roi_features = sampler(latent,boxes)#.reshape(box_centers.shape[0],box_centers.shape[1],-1) #
+            samples = torch.cat((samples, roi_features),dim=1)
+
+        samples = [torch.squeeze(samples.reshape(samples.shape[0],samples.shape[1],-1),-1).reshape(*box_centers.shape[:2],-1)]
+
+        return samples
+
     def make_boxes(self, box_centers):
         d = (self.sampling_support-1) / 2
         x1y1 = box_centers - d

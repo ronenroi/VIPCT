@@ -118,7 +118,7 @@ class PerspectiveCameras(TensorProperties):
         return self.camera_center #self.P[:, :, 3]
 
 
-    def _transform_points(self, points, eps: Optional[float] = None) -> List[torch.Tensor]:
+    def _transform_points_old(self, points, eps: Optional[float] = None) -> List[torch.Tensor]:
         """
         Use this transform to transform a set of 3D points. Assumes row major
         ordering of the input points.
@@ -169,6 +169,60 @@ class PerspectiveCameras(TensorProperties):
         #     points_out = points_out.reshape(points.shape[0],-1)
 
         return points_out
+
+
+    def _transform_points(self, points, eps: Optional[float] = None) -> List[torch.Tensor]:
+        """
+        Use this transform to transform a set of 3D points. Assumes row major
+        ordering of the input points.
+
+        Args:
+            points: List of Tensor of shape (Pi, 3)
+            eps: If eps!=None, the argument is used to clamp the
+                last coordinate before performing the final division.
+                The clamping corresponds to:
+                last_coord := (last_coord.sign() + (last_coord==0)) *
+                torch.clamp(last_coord.abs(), eps),
+                i.e. the last coordinates that are exactly 0 will
+                be clamped to +eps.
+
+        Returns:
+            points_out: points of shape (N, num_cams, P, 2) or (num_cams,P, 2) depending
+            on the dimensions of the transform
+        """
+        points_batch = []
+        for p in points:
+            ones = torch.ones(p.shape[0], 1, dtype=p.dtype, device=p.device)
+            points_batch.append(torch.cat([p, ones], dim=1))
+
+        # points_batch = [p.clone() ]
+        # if points_batch.dim() == 2:
+        #     points_batch = points_batch[None]  # (P, 3) -> (1, P, 3)
+        # if points_batch.dim() != 3:
+        #     msg = "Expected points to have dim = 2 or dim = 3: got shape %r"
+        #     raise ValueError(msg % repr(points.shape))
+
+        # N, P, _3 = points_batch.shape
+
+        composed_matrices = self.P#[self.index,...]
+        if composed_matrices.dim() == 3:
+            composed_matrices = composed_matrices[None]
+        composed_matrices = composed_matrices.transpose(-2, -1)
+        points_out = [_broadcast_bmm(points, composed_matrix) for points, composed_matrix in zip(points_batch, composed_matrices)]
+        denom = [out[..., 2:] for out in points_out]  # denominator
+        if eps is not None:
+            for i, d in enumerate(denom):
+                d_sign = d.sign() + (d == 0.0).type_as(d)
+                denom[i] = d_sign * torch.clamp(d.abs(), eps)
+        points_out = [out[..., [1,0]] / d for out, d in zip(points_out, denom)]
+
+        # When transform is (1, 4, 4) and points is (P, 3) return
+        # points_out of shape (P, 3)
+        # if points_out.shape[0] == 1 and points.dim() == 2:
+        #     points_out = points_out.reshape(points.shape[0],-1)
+
+        return points_out
+
 
 
     def project_points(
@@ -582,7 +636,6 @@ def _broadcast_bmm(a, b):
 
 if __name__ == "__main__":
     import pickle
-    import shdom
     import matplotlib.pyplot as plt
     from volumes import Volumes
 
@@ -609,7 +662,7 @@ if __name__ == "__main__":
         return samples  # (Cams,cum_channels, N)
 
 
-    with open('data/cloud_results_6001.pkl', 'rb') as outfile:
+    with open('/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/train/cloud_results_0.pkl', 'rb') as outfile:
         x = pickle.load(outfile)
     image_sizes = np.array([image.shape for image in x['images']])
     cameras = PerspectiveCameras(image_sizes, P=x['cameras_P'])

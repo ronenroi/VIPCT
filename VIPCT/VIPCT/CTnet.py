@@ -55,7 +55,7 @@ class CTnet(torch.nn.Module):
         append_xyz = cfg.ct_net.append_xyz
         append_dir = cfg.ct_net.append_dir
         feature_encoding = cfg.ct_net.feature_encoding
-
+        self.use_neighbours = cfg.ct_net.use_neighbours if hasattr(cfg.ct_net,'use_neighbours') else False
 
 
         # self._spatial_encoder = Backbone.from_conf(cfg)
@@ -96,18 +96,18 @@ class CTnet(torch.nn.Module):
                 input_skips=append_xyz,
             )
             self.decoder_input_size += 64*2
-            self.decoder_input_size *= n_cam
+
         else:
             self.mlp_xyz = None
             self.mlp_cam_center = None
-
+        self.decoder_input_size *= n_cam
         if feature_encoding:
             self._feature_encoder = FeatureEncoding(n_harmonic_functions=cfg.feature_encoder.n_harm)
             self.decoder_input_size *= (1 + 2 * cfg.feature_encoder.n_harm)
         else:
             self._feature_encoder = None
 
-        self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size)
+        self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.use_neighbours)
 
         # self.mlp_dir = MLPWithInputSkips(
         #     n_layers_dir,
@@ -160,11 +160,14 @@ class CTnet(torch.nn.Module):
         image = image.view(-1, *image.shape[2:])
         image_features = self._image_encoder(image)
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
-        # del image
+        del image
         # mask = self.mask_net(image_features)
 
         if self.training:
-            volume, query_points, _ = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
+            if self.use_neighbours:
+                volume, query_points, _ = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
+            else:
+                volume, query_points, _ = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
         else:
             volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
         n_query = [points.shape[0] for points in query_points]
@@ -175,7 +178,7 @@ class CTnet(torch.nn.Module):
 
         else:
             embed_camera_center = None
-        # del cameras
+        del cameras
         if self.mlp_xyz:
             query_points = torch.vstack(query_points).view(-1,3)
             query_points = self.mlp_xyz(query_points, query_points)
@@ -191,13 +194,13 @@ class CTnet(torch.nn.Module):
             if query_points is not None:
                 query_points = query_points.unsqueeze(1).expand(-1,latent.shape[1],-1)
                 latent = torch.cat((latent,query_points),-1)
-                # del query_points
+                del query_points
             if embed_camera_center is not None:
                 embed_camera_center = embed_camera_center#.unsqueeze(1).expand(-1,int(latent.shape[0]/Vbatch),-1,-1)
                 # embed_camera_center = embed_camera_center.reshape(-1,*embed_camera_center.shape[2:])
                 latent = torch.split(latent,n_query)
                 latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
-                # del embed_camera_center
+                del embed_camera_center
 
             if self._feature_encoder:
                 latent = self._feature_encoder(latent)
@@ -220,7 +223,7 @@ class CTnet(torch.nn.Module):
                     query_points_chunk = query_points[chunk]
                     query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
                     latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
-                    # del query_points_chunk
+                    del query_points_chunk
                 if embed_camera_center is not None:
                     assert Vbatch == 1
                     embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1, int(latent_chunk.shape[0] / Vbatch), -1, -1)

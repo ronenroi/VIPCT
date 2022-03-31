@@ -13,10 +13,60 @@ from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-
+import matplotlib.pyplot as plt
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
+
+def show_scatter_plot(gt_param, est_param):
+    gt_param = gt_param.detach().cpu().numpy().ravel()
+    est_param = est_param.detach().cpu().numpy().ravel()
+    max_val = max(gt_param.max(), est_param.max())
+    fig, ax = plt.subplots()
+    ax.scatter(gt_param, est_param, facecolors='none', edgecolors='b')
+    ax.set_xlim([0, 1.1 * max_val])
+    ax.set_ylim([0, 1.1 * max_val])
+    ax.plot(ax.get_xlim(), ax.get_ylim(), c='r', ls='--')
+    ax.set_ylabel('Estimated', fontsize=14)
+    ax.set_xlabel('True', fontsize=14)
+    ax.set_aspect('equal')
+    plt.show()
+
+def show_scatter_plot_altitute(gt_param, est_param):
+    import matplotlib.cm as cm
+    gt_param = gt_param.detach().cpu().numpy()
+    est_param = est_param.detach().cpu().numpy()
+    colors = cm.rainbow(np.linspace(0, 1, gt_param.shape[-1]))
+
+    max_val = max(gt_param.max(), est_param.max())
+    fig, ax = plt.subplots()
+    for i, c in enumerate(colors):
+        if i>10:
+            ax.scatter(gt_param[...,i].ravel(), est_param[...,i].ravel(),
+                   facecolors='none', edgecolors=c, label=i)
+        else:
+            ax.scatter(gt_param[..., i].ravel(), est_param[..., i].ravel(),
+                       facecolors='none', edgecolors=c)
+    ax.set_xlim([0, 1.1 * max_val])
+    ax.set_ylim([0, 1.1 * max_val])
+    ax.legend(loc='best',fontsize='small')
+    ax.plot(ax.get_xlim(), ax.get_ylim(), c='r', ls='--')
+    ax.set_ylabel('Estimated', fontsize=14)
+    ax.set_xlabel('True', fontsize=14)
+    ax.set_aspect('equal')
+    plt.show()
+
+def volume_plot(gt_param, est_param):
+    gt_param = gt_param.detach().cpu().numpy()
+    est_param = est_param.detach().cpu().numpy()
+    ax = plt.figure().add_subplot(projection='3d')
+    plt.title("GT")
+    ax.voxels(gt_param)
+    plt.show()
+    ax = plt.figure().add_subplot(projection='3d')
+    plt.title("Est.")
+    ax.voxels(est_param)
+    plt.show()
 
 @hydra.main(config_path=CONFIG_DIR, config_name="basic_test")
 def main(cfg: DictConfig):
@@ -27,7 +77,9 @@ def main(cfg: DictConfig):
 
     # Device on which to run.
     if torch.cuda.is_available() and cfg.debug == False:
-        device = "cuda"
+        n_device = torch.cuda.device_count()
+        cfg.gpu = 0 if n_device==1 else cfg.gpu
+        device = f"cuda:{cfg.gpu}"
     else:
         warnings.warn(
             "Please note that although executing on CPU is supported,"
@@ -127,9 +179,9 @@ def main(cfg: DictConfig):
         val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
         val_camera = PerspectiveCameras(image_size=image_sizes, P=torch.tensor(projection_matrix, device=device).float(),
                                         camera_center=torch.tensor(camera_center, device=device).float(), device=device)
-        masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
+        masks = [torch.tensor(mask) if mask is not None else torch.ones(32,32,32,device=device, dtype=bool) for mask in masks]
         if model.val_mask_type == 'gt_mask':
-            masks = val_volume.extinctions > val_volume._ext_thr
+            masks = val_volume.extinctions > 0 #val_volume._ext_thr
 
     # Activate eval mode of the model (lets us do a full rendering pass).
         with torch.no_grad():
@@ -170,7 +222,7 @@ def main(cfg: DictConfig):
                 gt_vol = val_volume.extinctions[0].squeeze()
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
             # est_vols[gt_vol==0] = 0
-            est_vols[est_vols<0] = 0
+            est_vols[est_vols<1] = 0
             loss_val += err(est_vols, gt_vol)
             # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
             print(relative_error(ext_est=est_vols,ext_gt=gt_vol))
@@ -179,6 +231,10 @@ def main(cfg: DictConfig):
             relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             batch_time_net.append(time_net)
+            if True:
+                show_scatter_plot(gt_vol,est_vols)
+                show_scatter_plot_altitute(gt_vol,est_vols)
+                volume_plot(gt_vol,est_vols)
             if writer:
                 writer._iter = iteration
                 writer._dataset = 'val'  # .format(val_i)
@@ -210,3 +266,5 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
+
+

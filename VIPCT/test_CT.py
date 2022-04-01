@@ -89,7 +89,7 @@ def main(cfg: DictConfig):
         # Init the visualization visdom env.
     log_dir = os.getcwd()
     log_dir = log_dir.replace('outputs','test_results')
-    writer = SummaryWriter(log_dir)
+    writer = None #SummaryWriter(log_dir)
     results_dir = log_dir #os.path.join(log_dir, 'test_results')
     checkpoint_resume_path = os.path.join(hydra.utils.get_original_cwd(), cfg.checkpoint_resume_path)
     if len(results_dir) > 0:
@@ -109,12 +109,13 @@ def main(cfg: DictConfig):
     model = CTnet(cfg=cfg, n_cam=n_cam)
 
     # Move the model to the relevant device.
-    model.to(device)
+
     # Resume training if requested.
     assert os.path.isfile(checkpoint_resume_path)
     print(f"Resuming from checkpoint {checkpoint_resume_path}.")
-    loaded_data = torch.load(checkpoint_resume_path)
+    loaded_data = torch.load(checkpoint_resume_path, map_location=device)
     model.load_state_dict(loaded_data["model"])
+    model.to(device)
     # stats = pickle.loads(loaded_data["stats"])
     # print(f"   => resuming from epoch {stats.epoch}.")
     # optimizer_state_dict = loaded_data["optimizer"]
@@ -153,7 +154,7 @@ def main(cfg: DictConfig):
         #     num_samples=cfg.optimizer.max_epochs,
         # ),
     )
-    err = torch.nn.MSELoss()
+    # err = torch.nn.MSELoss()
     # err = torch.nn.L1Loss(reduction='sum')
     # Set the model to the training mode.
     model.eval().float()
@@ -165,7 +166,7 @@ def main(cfg: DictConfig):
         val_scatter_ind = np.random.permutation(len(val_dataloader))[:5]
 
     # Validation
-    loss_val = 0
+    # loss_val = 0
     relative_err= []
     relative_mass_err = []
     batch_time_net = []
@@ -179,9 +180,10 @@ def main(cfg: DictConfig):
         val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
         val_camera = PerspectiveCameras(image_size=image_sizes, P=torch.tensor(projection_matrix, device=device).float(),
                                         camera_center=torch.tensor(camera_center, device=device).float(), device=device)
-        masks = [torch.tensor(mask) if mask is not None else torch.ones(32,32,32,device=device, dtype=bool) for mask in masks]
         if model.val_mask_type == 'gt_mask':
             masks = val_volume.extinctions > 0 #val_volume._ext_thr
+        else:
+            masks = [torch.tensor(mask) if mask is not None else torch.ones(*extinction[0].shape,device=device, dtype=bool) for mask in masks]
 
     # Activate eval mode of the model (lets us do a full rendering pass).
         with torch.no_grad():
@@ -222,16 +224,17 @@ def main(cfg: DictConfig):
                 gt_vol = val_volume.extinctions[0].squeeze()
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
             # est_vols[gt_vol==0] = 0
-            est_vols[est_vols<1] = 0
-            loss_val += err(est_vols, gt_vol)
+            est_vols[est_vols<0] = 0
+            # loss_val += err(est_vols, gt_vol)
             # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
             print(relative_error(ext_est=est_vols,ext_gt=gt_vol))
             # if relative_error(ext_est=est_vols,ext_gt=gt_vol)>2:
             #     print()
+
             relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             batch_time_net.append(time_net)
-            if True:
+            if False:
                 show_scatter_plot(gt_vol,est_vols)
                 show_scatter_plot_altitute(gt_vol,est_vols)
                 volume_plot(gt_vol,est_vols)
@@ -243,7 +246,7 @@ def main(cfg: DictConfig):
             # Update stats with the validation metrics.
 
 
-    loss_val /= (val_i + 1)
+    # loss_val /= (val_i + 1)
     relative_err = np.array(relative_err)
     relative_mass_err =np.array(relative_mass_err)
     batch_time_net = np.array(batch_time_net)

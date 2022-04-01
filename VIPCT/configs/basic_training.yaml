@@ -1,17 +1,17 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_CASS_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-06_FixCT_wd1.0e-05_n_sampling_nets10_FINETUNEcp_130000/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 3
 debug: False
-resume: False
+resume: True
 stats_print_interval: 25
 validation_iter_interval: 2500
 checkpoint_iteration_interval: 5000
-checkpoint_resume_path: ''
-gpu: 3
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
+gpu: 0
 data:
-  dataset_name: 'BOMEX_10cams' # 'satellites_images' CASS_10cams
+  dataset_name: 'CASS_10cams' # 'satellites_images' CASS_10cams
 #  image_size: [116, 116] # [height, width]
   n_training: -1
   n_val: 40
@@ -21,10 +21,10 @@ data:
   std: 0.0072
 optimizer:
   max_epochs: 100000
-  lr: 5.0e-05
+  lr: 5.0e-06
   wd: 1.0e-05
   batch_size: 1
-  iter_steps: [150000, 300000]
+  iter_steps: [120000, 300000]
   lr_scheduler_gamma: 0.1
   loss: 'L2_relative_error' #'L1_relative_error'
 ct_net:
@@ -36,7 +36,7 @@ ct_net:
   n_layers_dir: 2
   append_xyz: [2]
   append_dir: [2]
-  n_query: 1000
+  n_query: 400
   val_n_query: 200
   stop_encoder_grad: False
   dir_at_camera_coordinates: True

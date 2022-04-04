@@ -29,7 +29,7 @@ if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/D
 
 # DEFAULT_URL_ROOT = "https://dl.fbaipublicfiles.com/pytorch3d_nerf_data"
 
-ALL_DATASETS = ("satellites_images", "dom_satellites_images", "CASS_10cams", "BOMEX_10cams", "BOMEX_32cams")
+ALL_DATASETS = ("CASS_10cams", "BOMEX_10cams", "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2")
 
 
 def trivial_collate(batch):
@@ -90,6 +90,18 @@ def get_cloud_datasets(
     elif dataset_name == 'BOMEX_10cams':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras')
         image_size = [116, 116]
+    elif dataset_name == 'BOMEX_10cams_varying':
+        data_root = data_root.replace('home', 'wdata')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positions')
+        image_size = [116, 116]
+    elif dataset_name == 'BOMEX_10cams_varyingV2':
+        data_root = data_root.replace('home', 'wdata')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV2')
+        image_size = [116, 116]
+    elif dataset_name == 'BOMEX_10cams_50m':
+        data_root = data_root.replace('home', 'wdata')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
+        image_size = [48, 48]
     elif dataset_name == 'BOMEX_32cams':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras')
         image_size = [116, 116]
@@ -98,11 +110,16 @@ def get_cloud_datasets(
         image_size = [236, 236]
     # image_size = cfg.data.image_size
 
-
     print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
     data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
     train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
-
+    # for cloud_path in data_train_paths:
+    #     try:
+    #         with open(cloud_path, 'rb') as f:
+    #             data = pickle.load(f)
+    #     except:
+    #         print(cloud_path)
+    # print('DONE')
     # for file in data_train_paths:
     #     with open(file, 'rb') as f:
     #         data = pickle.load(f)
@@ -128,12 +145,19 @@ def get_cloud_datasets(
             data_train_paths,
         n_cam=n_cam,
         rand_cam = rand_cam,
-        mask_type=cfg.ct_net.mask_type, mean=mean, std=std
+        mask_type=cfg.ct_net.mask_type,
+        mean=mean,
+        std=std,
+    dataset_name = dataset_name,
+
     )
 
     if dataset_name == 'CASS_10cams':
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    elif dataset_name == 'BOMEX_10cams' or dataset_name == 'BOMEX_32cams':
+    elif dataset_name == 'BOMEX_10cams' or dataset_name == 'BOMEX_32cams' or dataset_name == 'BOMEX_10cams_varying' \
+            or 'BOMEX_10cams_50m':
+        val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    elif dataset_name == 'BOMEX_10cams_varyingV2':
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
     else:
         val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]
@@ -154,14 +178,15 @@ def get_cloud_datasets(
     val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
     val_paths = val_paths[:val_len]
     val_dataset = CloudDataset(val_paths, n_cam=n_cam,
-        rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std)
+        rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name
+)
 
 
     return train_dataset, val_dataset, n_cam
 
 
 class CloudDataset(Dataset):
-    def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1):
+    def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name=''):
         self.cloud_dir = cloud_dir
         self.transform = transform
         self.target_transform = target_transform
@@ -170,6 +195,7 @@ class CloudDataset(Dataset):
         self.rand_cam = rand_cam
         self.mean = mean
         self.std = std
+        self.dataset_name = dataset_name
 
     def __len__(self):
         return len(self.cloud_dir)
@@ -178,11 +204,17 @@ class CloudDataset(Dataset):
         cloud_path = self.cloud_dir[idx]
         with open(cloud_path, 'rb') as f:
             data = pickle.load(f)
-        if self.rand_cam:
-            cam_i = torch.randperm(data['images'].shape[0])[:self.n_cam]
+        images = data['images']
+        mask = None
+        if self.mask_type == 'space_carving':
+            mask = data['mask']
+        if 'varying' in self.dataset_name:
+            index = torch.randperm(10)[0]
+            cam_i = torch.arange(index,100,10)
+            mask = mask[index] if mask is not None else None
         else:
             cam_i = torch.arange(self.n_cam)
-        images = data['images'][cam_i]
+        images = images[cam_i]
         images -= self.mean
         images /= self.std
         grid = data['grid']
@@ -194,13 +226,9 @@ class CloudDataset(Dataset):
         extinction = data['ext']
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
-        mask = None
-        if self.mask_type == 'space_carving':
-            # if True:
-            #     path = cloud_path.replace('10cameras','32cameras')
-            #     with open(path, 'rb') as f:
-            #         data = pickle.load(f)
-            mask = data['mask']
+
+
+
         # train_ext.append(train_data['ext'])
 
         # if self.transform:

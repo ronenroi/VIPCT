@@ -214,14 +214,8 @@ def main(cfg: DictConfig):
                 time_net = 0
             assert len(est_vols)==1 ##TODO support validation with batch larger than 1
 
-            if False:
-                gt_vol = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(val_volume.extinctions.shape[0],-1)
-                in_vols = val_volume.extinctions.squeeze(1).reshape(val_volume.extinctions.shape[0],-1)
-                for vol, vol1, m in zip(gt_vol, in_vols, val_out['query_indices']):
-                    vol[m] = vol1[m]
-                gt_vol = gt_vol.reshape(val_volume.extinctions.shape).squeeze()
-            else:
-                gt_vol = val_volume.extinctions[0].squeeze()
+
+            gt_vol = val_volume.extinctions[0].squeeze()
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
             # est_vols[gt_vol==0] = 0
             est_vols[est_vols<0] = 0

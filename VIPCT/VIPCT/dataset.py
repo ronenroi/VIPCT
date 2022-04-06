@@ -14,6 +14,7 @@ import torch
 from torch.utils.data import Dataset
 import socket
 # print(socket.gethostname())
+import random
 
 # DEFAULT_DATA_ROOT = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/roi' \
 # if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256'
@@ -29,7 +30,7 @@ if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/D
 
 # DEFAULT_URL_ROOT = "https://dl.fbaipublicfiles.com/pytorch3d_nerf_data"
 
-ALL_DATASETS = ("CASS_10cams", "BOMEX_10cams", "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2")
+ALL_DATASETS = ("BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams", "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2")
 
 
 def trivial_collate(batch):
@@ -87,6 +88,14 @@ def get_cloud_datasets(
     if dataset_name == 'CASS_10cams':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
         image_size = [236, 236]
+    elif dataset_name == 'BOMEX_CASS_10cams':
+        data_root_cass = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
+        data_root_bomex = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras')
+        # image_size = [236, 236]
+    elif dataset_name == 'CASS_10cams_50m':
+        data_root = data_root.replace('home', 'wdata')
+        data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
+        image_size = [96, 96]
     elif dataset_name == 'BOMEX_10cams':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras')
         image_size = [116, 116]
@@ -102,6 +111,10 @@ def get_cloud_datasets(
         data_root = data_root.replace('home', 'wdata')
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
         image_size = [48, 48]
+    elif dataset_name == 'BOMEX_32cams_50m':
+        data_root = data_root.replace('home', 'wdata')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_50m')
+        image_size = [48, 48]
     elif dataset_name == 'BOMEX_32cams':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras')
         image_size = [116, 116]
@@ -110,8 +123,14 @@ def get_cloud_datasets(
         image_size = [236, 236]
     # image_size = cfg.data.image_size
 
-    print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-    data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
+    if not dataset_name == 'BOMEX_CASS_10cams':
+        print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
+        data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
+    else:
+        print(f"Loading dataset {dataset_name}...")
+        data_train_paths = [f for f in glob.glob(os.path.join(data_root_cass, "train/cloud*.pkl"))]
+        data_train_paths += [f for f in glob.glob(os.path.join(data_root_bomex, "train/cloud*.pkl"))]
+        random.shuffle(data_train_paths)
     train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
     # for cloud_path in data_train_paths:
     #     try:
@@ -151,16 +170,22 @@ def get_cloud_datasets(
     dataset_name = dataset_name,
 
     )
-
-    if dataset_name == 'CASS_10cams':
-        val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    elif dataset_name == 'BOMEX_10cams' or dataset_name == 'BOMEX_32cams' or dataset_name == 'BOMEX_10cams_varying' \
-            or 'BOMEX_10cams_50m':
-        val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    elif dataset_name == 'BOMEX_10cams_varyingV2':
+    if not dataset_name == 'BOMEX_CASS_10cams':
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
     else:
-        val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]
+        val_paths = [f for f in glob.glob(os.path.join(data_root_cass, "test/cloud*.pkl"))]
+        val_paths += [f for f in glob.glob(os.path.join(data_root_bomex, "test/cloud*.pkl"))]
+        random.shuffle(val_paths)
+
+    # if dataset_name == 'CASS_10cams':
+    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    # elif dataset_name == 'BOMEX_10cams' or dataset_name == 'BOMEX_32cams' or dataset_name == 'BOMEX_10cams_varying' \
+    #         or 'BOMEX_10cams_50m':
+    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    # elif dataset_name == 'BOMEX_10cams_varyingV2':
+    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    # else:
+    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]
     # for file in val_paths:
     #     with open(file, 'rb') as f:
     #         data = pickle.load(f)
@@ -208,6 +233,8 @@ class CloudDataset(Dataset):
         mask = None
         if self.mask_type == 'space_carving':
             mask = data['mask']
+        elif self.mask_type == 'space_carving_morph':
+            mask = data['mask_morph']
         if 'varying' in self.dataset_name:
             index = torch.randperm(10)[0]
             cam_i = torch.arange(index,100,10)

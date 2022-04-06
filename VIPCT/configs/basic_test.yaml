@@ -3,10 +3,10 @@ hydra:
     dir: ../test_results/${now:%Y-%m-%d}/${now:%H-%M-%S}
 seed: 3
 debug: False
-gpu: 1
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-01_CASS_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets10_FUNETUNEDFROMBOMEX/09-15-28/checkpoints/cp_20000.pth'
+gpu: 0
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-01_CASS_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets10/09-30-57/checkpoints/cp_80000.pth'
 data:
-  dataset_name: 'CASS_10cams'
+  dataset_name: 'BOMEX_10cams'
 #  image_size: [261, 261] # [height, width]
   n_val: -1
 #backbone:

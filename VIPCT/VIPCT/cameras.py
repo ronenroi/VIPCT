@@ -297,6 +297,98 @@ class PerspectiveCameras(TensorProperties):
 
 
 
+class AirMSPICameras(TensorProperties):
+    """
+    A class which stores a batch of parameters to generate a batch of
+    transformation matrices using the multi-view geometry convention for
+    perspective camera.
+
+    Parameters for this camera are specified in NDC if `in_ndc` is set to True.
+    If parameters are specified in screen space, `in_ndc` must be set to False.
+    """
+
+    def __init__(
+            self,
+            mapping: torch.tensor,
+            device: Device = "cpu"
+    ):
+
+        super().__init__(
+            device=device,
+            mapping=mapping,
+        )
+
+        # if (self.image_size < 1).any():  # pyre-ignore
+        #     raise ValueError("Image_size provided has invalid values")
+
+
+    # def get_camera_center(self) -> torch.Tensor:
+    #     """
+    #     Return the 3D location of the camera optical center
+    #     in the world coordinates.
+    #
+    #     Args:
+    #         **kwargs: parameters for the camera extrinsics can be passed in
+    #             as keyword arguments to override the default values
+    #             set in __init__.
+    #
+    #     Setting T here will update the values set in init as this
+    #     value may be needed later on in the rendering pipeline e.g. for
+    #     lighting calculations.
+    #
+    #     Returns:
+    #         C: a batch of 3D locations of shape (N, 3) denoting
+    #         the locations of the center of each camera in the batch.
+    #     """
+    #     # the camera center is the translation component (the last column) of the transform matrix P (3x4 RT matrix)
+    #     return self.camera_center #self.P[:, :, 3]
+
+
+
+    def project_points(
+        self, points, eps: Optional[float] = None, screen: bool = False
+    ) -> torch.Tensor:
+        """
+        Transforms points from world space to screen space.
+        Input points follow the SHDOM coordinate system conventions: +X[km] (North), +Y [km] (East), +Z[km] (Up).
+        Output points are in screen space: +X right, +Y down, origin at top left corner.
+
+        Args:
+            points: list of torch tensors, each of shape (..., 3).
+            eps: If eps!=None, the argument is used to clamp the
+                divisor in the homogeneous normalization of the points
+                transformed to the ndc space. Please see
+                `transforms.Transform3d.transform_points` for details.
+
+                For `CamerasBase.transform_points`, setting `eps > 0`
+                stabilizes gradients since it leads to avoiding division
+                by excessively low numbers for points close to the
+                camera plane.
+            screen: if True returns the projected points in pixels
+                    else in ndc space: X, Y in [-1 1]. For non square
+                    images, we scale the points such that largest side
+                    has range [-1, 1] and the smallest side has range
+                    [-u, u], with u < 1.
+
+        Returns
+            new_points: transformed points with the same shape as the input
+            except the last axis size is 2.
+        """
+        points_out = [map[:,p,:] for map, p in zip([self.mapping], points)]
+        return points_out
+
+
+    def clone(self):
+        """
+        Returns a copy of `self`.
+        """
+        cam_type = type(self)
+        other = cam_type(device=self.device)
+        return super().clone(other)
+
+
+
+
 
 
 
@@ -661,51 +753,73 @@ if __name__ == "__main__":
             ))), dim=1)
         return samples  # (Cams,cum_channels, N)
 
+    if False:
+        with open('/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/train/cloud_results_0.pkl', 'rb') as outfile:
+            x = pickle.load(outfile)
+        image_sizes = np.array([image.shape for image in x['images']])
+        cameras = PerspectiveCameras(image_sizes, P=x['cameras_P'])
+        camera_position_list = x['cameras_pos']
+        layers = 4
+        images = [torch.arange(int(128/(i+1))**2).reshape(1,1,int(128/(i+1)),-1).double().repeat(image_sizes.shape[0],1,1,1) for i in range(layers)]
+        indices = torch.topk(torch.tensor(x['ext']).reshape(-1), 10).indices
+        print(torch.tensor(x['ext']).reshape(-1)[indices])
+        grid = x['grid']
+        volume = Volumes(torch.tensor(x['ext'])[None, None].double(), grid)
+        projected_to_world_points = volume.get_coord_grid()[0][indices].double()
+        projected_to_screen = cameras.project_points(projected_to_world_points, screen=True)
+        projected_to_ndc = cameras.project_points(projected_to_world_points, screen=False)
+        for im, screen_points in zip(x['images'], projected_to_screen):
+            plt.imshow(im / np.max(im))
+            plt.scatter(screen_points[:, 1].cpu().numpy(), screen_points[:, 0].cpu().numpy(), s=1, c='red',
+                        marker='x')
+            plt.show()
+        A = sample_features(images, projected_to_ndc.double())
+        print(sample_features(images, projected_to_ndc.double()))
+        print()
+    else:
+        from .cameras import AirMSPICameras
+        DEFAULT_DATA_ROOT = '/home/roironen/Data'
+        data_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train'
+        image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC/'
+        mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
+        with open(mapping_path, 'rb') as f:
+            mapping = pickle.load(f)
+        images_mapping_list = []
+        for _, map in mapping.items():
+            voxels_list = []
+            v = map.values()
+            voxels = np.array(list(v), dtype=object)
+            ctr = 0
+            for i, voxel in enumerate(voxels):
+                if len(voxel) > 0:
+                    pixels = np.unravel_index(voxel, np.array([350,350]))
+                    mean_px = np.mean(pixels, 1)
+                    voxels_list.append(mean_px)
+                else:
+                    ctr += 1
+                    voxels_list.append([-100000, -100000])
+            images_mapping_list.append(voxels_list)
+        with open(image_root, 'rb') as f:
+            images = pickle.load(f)['images']
+        image_sizes = np.array([[350,350]]*9)
+        device = 'cuda'
+        cameras = AirMSPICameras(image_size=torch.tensor(image_sizes),mapping=torch.tensor(mapping, device=device).float(),
+                                         device=device)
+        with open(data_root, 'rb') as f:
+            x = pickle.load(f)
+        layers = 4
+        indices = torch.topk(torch.tensor(x['ext']).reshape(-1), 10).indices
+        print(torch.tensor(x['ext']).reshape(-1)[indices])
+        grid = x['grid']
+        volume = Volumes(torch.tensor(x['ext'])[None, None].double(), grid)
+        projected_to_screen = cameras.project_points(indices, screen=True)
+        for im, screen_points in zip(x['images'], projected_to_screen):
+            plt.imshow(im / np.max(im))
+            plt.scatter(screen_points[:, 1].cpu().numpy(), screen_points[:, 0].cpu().numpy(), s=1, c='red',
+                        marker='x')
+            plt.show()
+        A = sample_features(images, projected_to_screen.double())
+        print(sample_features(images, projected_to_screen.double()))
+        print()
 
-    with open('/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/train/cloud_results_0.pkl', 'rb') as outfile:
-        x = pickle.load(outfile)
-    image_sizes = np.array([image.shape for image in x['images']])
-    cameras = PerspectiveCameras(image_sizes, P=x['cameras_P'])
-    camera_position_list = x['cameras_pos']
-    layers = 4
-    images = [torch.arange(int(128/(i+1))**2).reshape(1,1,int(128/(i+1)),-1).double().repeat(image_sizes.shape[0],1,1,1) for i in range(layers)]
-    indices = torch.topk(torch.tensor(x['ext']).reshape(-1), 10).indices
-    print(torch.tensor(x['ext']).reshape(-1)[indices])
-    grid = x['grid']
-    volume = Volumes(torch.tensor(x['ext'])[None, None].double(), grid)
-    projected_to_world_points = volume.get_coord_grid()[0][indices].double()
-    projected_to_screen = cameras.project_points(projected_to_world_points, screen=True)
-    projected_to_ndc = cameras.project_points(projected_to_world_points, screen=False)
-    for im, screen_points in zip(x['images'], projected_to_screen):
-        plt.imshow(im / np.max(im))
-        plt.scatter(screen_points[:, 1].cpu().numpy(), screen_points[:, 0].cpu().numpy(), s=1, c='red',
-                    marker='x')
-        plt.show()
-    A = sample_features(images, projected_to_ndc.double())
-    print(sample_features(images, projected_to_ndc.double()))
-    print()
-    # for cam, cam_center, im in zip(cameras, camera_position_list, x['images']):
-    #     image_size = cam.image_size
-        # M = torch.max(image_size)
-        # #ndc coordinates
-        # rand_x = (torch.randint((image_size[0]).int(), [10]) - M/2) / M/2
-        # rand_y = (torch.randint((image_size[1]).int(), [10]) - M/2) / M/2
-        # z = torch.ones_like(rand_x)
-        # homogeneous_coordinates = torch.stack([rand_x,rand_y, z])
-        # x_c, y_c, z_c = norm(torch.matmul(
-        #     cam.R, torch.matmul(torch.linalg.inv(cam.K), homogeneous_coordinates).type(cam.R.dtype)))
-        #
-        # mu = z_c
-        # phi = np.arctan2(y_c, x_c)
-        # u = torch.sqrt(1 - mu**2) * torch.cos(phi)
-        # v = torch.sqrt(1 - mu**2) * torch.sin(phi)
-        # w = -mu
-        # projected_to_world_points = torch.tensor(cam_center)[...,None] + 0.5*torch.stack([u, v, w])
-        # projected_to_world_points = projected_to_world_points.T
-        # projected_to_world_points = torch.tensor([[0.1,3,1.12]]).double()
-
-        # ax = plt.figure().add_subplot(projection='3d')
-        # ax.quiver(cam_center[0], cam_center[1], cam_center[2], u, v, w, length=0.05, pivot='tail')
-        # ax.view_init(elev=10., azim=0)
-        # plt.show()
 

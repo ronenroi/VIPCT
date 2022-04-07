@@ -190,7 +190,7 @@ def main(cfg: DictConfig):
             est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(
                 val_volume.extinctions.shape[0], -1)
             n_points_mask = torch.sum(torch.stack(masks)*1.0) if isinstance(masks, list) else masks.sum()
-            if n_points_mask > 0:
+            if n_points_mask > cfg.min_mask_points:
                 net_start_time = time.time()
 
                 val_out = model(
@@ -221,7 +221,7 @@ def main(cfg: DictConfig):
             est_vols[est_vols<0] = 0
             # loss_val += err(est_vols, gt_vol)
             # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
-            print(relative_error(ext_est=est_vols,ext_gt=gt_vol))
+            print(f'{relative_error(ext_est=est_vols,ext_gt=gt_vol)}, {n_points_mask}')
             # if relative_error(ext_est=est_vols,ext_gt=gt_vol)>2:
             #     print()
 
@@ -245,11 +245,12 @@ def main(cfg: DictConfig):
     relative_mass_err =np.array(relative_mass_err)
     batch_time_net = np.array(batch_time_net)
     print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
-    relative_err1 = relative_err[relative_err<2]
+    masked = relative_err<2
+    relative_err1 = relative_err[masked]
     print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
 
     print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
-    relative_mass_err1 = relative_mass_err[relative_mass_err<2]
+    relative_mass_err1 = relative_mass_err[masked]
     print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
 
     print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')

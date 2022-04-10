@@ -285,7 +285,7 @@ def main(cfg: DictConfig):
                                 est_vols[i][m.squeeze(0)] = out_vol.squeeze(1)
                         else:
                             for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
-                                est_vol[m] = out_vol.squeeze(1)  # .reshape(m.shape)[m]
+                                est_vol.reshape(-1)[m] = out_vol.squeeze(1)  # .reshape(m.shape)[m]
                         assert len(est_vols)==1 ##TODO support validation with batch larger than 1
                         gt_vol = val_volume.extinctions[0].squeeze()
                         est_vols = est_vols.squeeze()

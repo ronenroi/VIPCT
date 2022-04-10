@@ -154,10 +154,14 @@ class Volumes:
 
         query_points = self.get_coord_grid()
         ext = self.extinctions.reshape(self.extinctions.shape[0], -1)
-        indices = None
+        # indices = None
+        indices = [torch.arange(ext.shape[1], device=self.extinctions.device)]
+
         if masks is not None:
             ext = [e[m.reshape(-1)] if m is not None else e for e, m in zip(ext, masks)]
             query_points = [points[m.reshape(-1),:] if m is not None else points for points, m in zip(query_points, masks)]
+            indices = [points[m.reshape(-1)] if m is not None else points for points, m in zip(indices, masks)]
+
 
         if method == 'topk':
             indices = [torch.topk(e, n_query if n_query < e.shape[0] else e.shape[0]).indices for e in ext]
@@ -179,14 +183,51 @@ class Volumes:
                 query_points[i] = torch.squeeze(e[:,1:])
 
         elif method == 'all':
+            pass
             # ext = torch.stack(ext)
             # query_points = torch.stack(query_points)
             # ext = list(ext)
-            indices = None
+            # indices = None
 
         else:
             NotImplementedError()
         return ext, query_points, indices
+
+    def get_query_points_microphysics(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
+
+        query_points = self.get_coord_grid()
+        ext = self.extinctions.reshape(self.extinctions.shape[0],self.extinctions.shape[1], -1)
+        # indices = None
+        indices = [torch.arange(ext.shape[-1], device=self.extinctions.device)]
+
+        if masks is not None:
+            ext = [e[:,m.reshape(-1)] if m is not None else e for e, m in zip(ext, masks)]
+            query_points = [points[m.reshape(-1),:] if m is not None else points for points, m in zip(query_points, masks)]
+            indices = [points[m.reshape(-1)] if m is not None else points for points, m in zip(indices, masks)]
+
+
+        if method == 'topk':
+            indices = [torch.topk(e[0], n_query if n_query < e.shape[-1] else e.shape[-1]).indices for e in ext]
+            ##TODO support for clouds with less than n_quary unmasked points
+            ext = [vol[:,index] for vol, index in zip(ext, indices)]
+            query_points = [points[index, :] for points, index in zip(query_points, indices)]
+        elif method == 'random':
+            indices = [torch.randperm(e.shape[-1])[:n_query if n_query < e.shape[-1] else e.shape[-1]] for e in ext]
+            ext = [vol[:,index] for vol, index in zip(ext, indices)]
+            query_points = [points[index, :] for points, index in zip(query_points, indices)]
+
+        elif method == 'all':
+            pass
+            # ext = torch.stack(ext)
+            # query_points = torch.stack(query_points)
+            # ext = list(ext)
+            # indices = None
+
+        else:
+            NotImplementedError()
+        ext = [e.T for e in ext]
+        return ext, query_points, indices
+
 
     def get_query_points_and_neighbours(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
 

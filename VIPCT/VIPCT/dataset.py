@@ -30,7 +30,9 @@ if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/D
 
 # DEFAULT_URL_ROOT = "https://dl.fbaipublicfiles.com/pytorch3d_nerf_data"
 
-ALL_DATASETS = ("BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams", "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2", "BOMEX_10cams_varyingV3", "BOMEX_10cams_varyingV4")
+ALL_DATASETS = ("BOMEX_10cams_polarization", "BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams",
+                "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2",
+                "BOMEX_10cams_varyingV3", "BOMEX_10cams_varyingV4")
 
 
 def trivial_collate(batch):
@@ -214,7 +216,6 @@ def get_cloud_datasets(
         rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name
 )
 
-
     return train_dataset, val_dataset, n_cam
 
 
@@ -252,13 +253,15 @@ class CloudDataset(Dataset):
         images = images[cam_i]
         images -= self.mean
         images /= self.std
-        grid = data['grid']
+
         # grid = data['net_grid']
         if hasattr(data, 'image_sizes'):
             image_sizes = data['image_sizes'][cam_i]
         else:
             image_sizes = [image.shape for image in images]
+
         extinction = data['ext']
+        grid = data['grid']
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
 
@@ -272,6 +275,132 @@ class CloudDataset(Dataset):
         #     label = self.target_transform(label)
         return images, extinction, grid, image_sizes, projection_matrix, camera_center, mask
 
+
+
+def get_cloud_microphysics_datasets(
+    cfg,
+    data_root: str = DEFAULT_DATA_ROOT,
+) -> Tuple[Dataset, Dataset, int]:
+    """
+    Obtains the training and validation dataset object for a dataset specified
+    with the `dataset_name` argument.
+
+    Args:
+        dataset_name: The name of the dataset to load.
+        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
+        data_root: The root folder at which the data is stored.
+
+    Returns:
+        train_dataset: The training dataset object.
+        val_dataset: The validation dataset object.
+        test_dataset: The testing dataset object.
+    """
+    dataset_name = cfg.data.dataset_name
+
+    if dataset_name not in ALL_DATASETS:
+        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
+
+    if dataset_name == 'BOMEX_10cams_polarization':
+        # data_root = '/wdata/yaelsc/Roi_ICCP22/CloudCT10sat_polarized_LWC_LOW_SC'
+        data_root = '/wdata/yaelsc/Roi_ICCP22/CloudCT10sat_polarized_LWC_NOISE/'
+        image_size = [123, 123]
+
+    if dataset_name == 'BOMEX_10cams_polarization':
+        print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
+        data_train_paths = [f for f in glob.glob(os.path.join(data_root, "*.pkl"))]
+
+    train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
+
+    data_train_paths = data_train_paths[:train_len]
+
+    n_cam = cfg.data.n_cam
+    mean = cfg.data.mean
+    std = cfg.data.std
+    rand_cam = cfg.data.rand_cam
+    train_dataset = MicrophysicsCloudDataset(
+            data_train_paths,
+        n_cam=n_cam,
+        rand_cam = rand_cam,
+        mask_type=cfg.ct_net.mask_type,
+        mean=mean,
+        std=std,
+    dataset_name = dataset_name,
+
+    )
+    if dataset_name == 'BOMEX_10cams_polarization':
+        val_paths = data_train_paths[:]
+
+    val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
+    val_paths = val_paths[:val_len]
+    val_dataset = MicrophysicsCloudDataset(val_paths, n_cam=n_cam,
+        rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name
+)
+
+    return train_dataset, val_dataset, n_cam
+
+
+class MicrophysicsCloudDataset(Dataset):
+    def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name=''):
+        self.cloud_dir = cloud_dir
+        self.transform = transform
+        self.target_transform = target_transform
+        self.mask_type = mask_type
+        self.n_cam = n_cam
+        self.rand_cam = rand_cam
+        self.mean = mean
+        self.std = std
+        self.dataset_name = dataset_name
+
+    def __len__(self):
+        return len(self.cloud_dir)
+
+    def __getitem__(self, idx):
+        cloud_path = self.cloud_dir[idx]
+        data_root = os.path.join(DEFAULT_DATA_ROOT, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras', 'train')
+        image_index = cloud_path.split('satellites_images_')[-1].split('.pkl')[0]
+        projection_path = os.path.join(data_root, f"cloud_results_{image_index}.pkl")
+        with open(cloud_path, 'rb') as f:
+            data = pickle.load(f)
+        images = np.concatenate((data['images'], data['DoLPs'][:, None], data['AoLPs'][:, None]), 1)
+        mask = None
+        if self.mask_type == 'space_carving':
+            mask = data['mask']
+        elif self.mask_type == 'space_carving_morph':
+            mask = data['mask_morph']
+        if 'varying' in self.dataset_name:
+            index = torch.randperm(10)[0]
+            cam_i = torch.arange(index,100,10)
+            mask = mask[index] if mask is not None else None
+        else:
+            cam_i = torch.arange(self.n_cam)
+        images = images[cam_i]
+        images -= np.array(self.mean).reshape((1,5,1,1))
+        images /= np.array(self.std).reshape((1,5,1,1))
+
+        microphysics = np.array([data['lwc'],data['reff'],data['veff']])
+        microphysics = microphysics[:,1:-1,1:-1,:-1]
+        mask = mask[1:-1,1:-1,:-1]
+        # grid = data['net_grid']
+        if hasattr(data, 'image_sizes'):
+            image_sizes = data['image_sizes'][cam_i]
+        else:
+            image_sizes = [image.shape[1:] for image in images]
+        with open(projection_path, 'rb') as f:
+            data = pickle.load(f)
+
+        grid = data['grid']
+        camera_center = data['cameras_pos'][cam_i]
+        projection_matrix = data['cameras_P'][cam_i]
+
+
+
+        # train_ext.append(train_data['ext'])
+
+        # if self.transform:
+        #     image = self.transform(image)
+        # if self.target_transform:
+        #     label = self.target_transform(label)
+        return images, microphysics, grid, image_sizes, projection_matrix, camera_center, mask
 
 ALL_DATASETS_AIRMSPI = ("BOMEX_9cams")
 
@@ -329,11 +458,10 @@ def get_airmspi_datasets(
 
     image_train_paths = image_train_paths[:train_len]
     # cloud_train_paths = cloud_train_paths[:train_len]
-
     n_cam = cfg.data.n_cam
     mean = cfg.data.mean
     std = cfg.data.std
-    rand_cam = cfg.data.rand_cam
+    # rand_cam = cfg.data.rand_cam
     train_dataset = AirMSPIDataset(
             cloud_train_path,
         image_train_paths,
@@ -370,13 +498,12 @@ class AirMSPIDataset(Dataset):
         image_index = image_dir.split('satellites_images_')[-1].split('.pkl')[0]
         cloud_path = os.path.join(self.cloud_dir, f"cloud_results_{image_index}.pkl")
 
+
         with open(cloud_path, 'rb') as f:
             data = pickle.load(f)
-        try:
-            with open(image_dir, 'rb') as f:
-                images = pickle.load(f)['images']
-        except:
-            print(image_dir)
+        with open(image_dir, 'rb') as f:
+            images = pickle.load(f)['images']
+
         mask = None
         if self.mask_type == 'space_carving':
             mask = data['mask']
@@ -390,7 +517,7 @@ class AirMSPIDataset(Dataset):
         #     image_sizes = data['image_sizes']
         # else:
         #     image_sizes = [image.shape for image in images]
-        extinction = data['ext']
+        extinction = data['ext'] / 10
 
         images_mapping_list = [ np.array(map)[mask.ravel()] for map in self.mapping]
 

@@ -118,6 +118,21 @@ class Decoder(nn.Module):
             ),
             torch.nn.Linear(512, out_size))
 
+        elif type == 'FixCTv4_microphysics':
+
+            self.decoder = nn.Sequential(
+                torch.nn.Linear(latent_size, 2048),
+                torch.nn.ReLU(True),
+                MLPWithInputSkips2(
+                8,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                512,
+                input_skips=(5,),
+
+            ),
+            torch.nn.Linear(512, 3*out_size))
+
         elif type == 'VIPCT':
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)

@@ -67,18 +67,18 @@ class SummaryWriter(object):
 
 
 
-    def monitor_scatterer_error(self, delta, epsilon):
+    def monitor_scatterer_error(self, delta, epsilon, name='extinction'):
         """
 
         """
         kwargs = {
             'delta': delta,
             'epsilon': epsilon,
-            'title': ['delta/', 'epsilon/'],
+            'title': [f'{name}_delta/', f'{name}_epsilon/'],
         }
         self.error_cbfn(kwargs)
 
-    def monitor_scatter_plot(self, est_param, gt_param, ind=0, dilute_percent=0.8):
+    def monitor_scatter_plot(self, est_param, gt_param, ind=0, dilute_percent=0.8, name='extinction'):
         """
         Monitor scatter plot of the parameters
 
@@ -98,7 +98,7 @@ class SummaryWriter(object):
         kwargs = {
             'est_param': est_param,
             'gt_param': gt_param,
-            'title': 'scatter_plot/{}-{}'.format(self._dataset,ind),
+            'title': '{}_scatter_plot/{}-{}'.format(name,self._dataset,ind),
             'percent': dilute_percent,
         }
         self.scatter_plot_cbfn(kwargs)

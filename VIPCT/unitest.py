@@ -150,6 +150,13 @@ if __name__ == "__main__":
         data_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train'
         image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC/satellites_images_856.pkl'
         mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
+        mapping_path = '/wdata/yaelsc/AirMSPI_raw_data/raw_data/voxel_pixel_list72x72x32_BOMEX_img350x350.pkl'
+        import scipy.io as sio
+
+
+        # val_image = torch.tensor(val_images, device=device).float()[None]
+        masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']
+
         image_index = image_root.split('satellites_images_')[-1].split('.pkl')[0]
         cloud_path = os.path.join(data_root, f"cloud_results_{image_index}.pkl")
         with open(mapping_path, 'rb') as f:
@@ -172,11 +179,17 @@ if __name__ == "__main__":
 
         with open(image_root, 'rb') as f:
             images = pickle.load(f)['images']
+        images = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/croped_airmspi_9images_for_Roi.mat')[
+            'croped_airmspi_images']
         image_sizes = np.array([[350, 350]] * 9)
         device = 'cuda'
         with open(cloud_path, 'rb') as f:
             x = pickle.load(f)
+        EXT = torch.tensor(masks)
         indices = torch.topk(torch.tensor(x['ext']).reshape(-1), 10).indices
+        N=16000
+        indices = torch.topk(EXT.reshape(-1), N).indices#[torch.randperm(N)[:1000]]
+
 
         mapping = [ np.array(map)[indices] for map in images_mapping_list]
 
@@ -185,8 +198,12 @@ if __name__ == "__main__":
         #                          device=device)
 
         layers = 4
-        print(torch.tensor(x['ext']).reshape(-1)[indices])
-        grid = x['grid']
+        # print(torch.tensor(x['ext']).reshape(-1)[indices])
+        # grid = x['grid']
+        gx = np.linspace(0, 0.05 * 72, 72, dtype=np.float32)
+        gy = np.linspace(0, 0.05 * 72, 72, dtype=np.float32)
+        gz = np.linspace(0, 0.04 * 32, 32, dtype=np.float32)
+        grid = [np.array([gx, gy, gz])]
         volume = Volumes(torch.tensor(x['ext'])[None, None].double(), grid)
         # projected_to_screen = cameras.project_points(indices, screen=True)
         for im, screen_points in zip(images, mapping):

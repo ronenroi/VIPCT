@@ -31,6 +31,7 @@ class Backbone(nn.Module):
             sampling_output_size=8,
             sampling_support = 8,
             out_channels = 256,
+            in_channels = 1,
             n_sampling_nets=1,
             to_flatten = False,
             modify_first_layer=True
@@ -73,7 +74,7 @@ class Backbone(nn.Module):
             self.model = resnet_fpn_backbone(backbone_name=extractor,
                 pretrained=pretrained, norm_layer=norm_layer, out_channels=out_channels, trainable_layers=5)
             if modify_first_layer:
-                self.model.body.conv1 = nn.Conv2d(1, self.model.body.conv1.out_channels, kernel_size=3,
+                self.model.body.conv1 = nn.Conv2d(in_channels, self.model.body.conv1.out_channels, kernel_size=3,
                                              stride=1, padding=1,
                                              bias=self.model.body.conv1.bias != None)
                 self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
@@ -201,7 +202,10 @@ class Backbone(nn.Module):
         x1y1 = box_centers - d
         x2y2 = box_centers + d
         # boxes = list(torch.cat((x1y1,x2y2),dim=-1).view(-1,box_centers.shape[-2],4))
-        boxes = torch.cat((x1y1,x2y2),dim=-1).view(-1,4)
+        try:
+            boxes = torch.cat((x1y1,x2y2),dim=-1).view(-1,4)
+        except:
+            print()
         return boxes
 
     def sample_features(self, latents, uv):
@@ -281,6 +285,7 @@ class Backbone(nn.Module):
             sampling_output_size=cfg.backbone.sampling_output_size,
             sampling_support=cfg.backbone.sampling_support,
             out_channels = cfg.backbone.out_channels,
+            in_channels = cfg.backbone.in_channels if hasattr(cfg.backbone,'in_channels') else 1,
             n_sampling_nets = cfg.backbone.n_sampling_nets,
             to_flatten = cfg.backbone.feature_flatten,
             modify_first_layer = cfg.backbone.modify_first_layer

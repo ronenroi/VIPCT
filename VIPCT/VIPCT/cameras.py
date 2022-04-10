@@ -374,7 +374,10 @@ class AirMSPICameras(TensorProperties):
             new_points: transformed points with the same shape as the input
             except the last axis size is 2.
         """
-        points_out = [map[:,p,:] for map, p in zip([self.mapping], points)]
+        if points is not None:
+            points_out = [map[:,p,:] for map, p in zip([self.mapping], points)]
+        else:
+            points_out = [self.mapping]
         return points_out
 
 

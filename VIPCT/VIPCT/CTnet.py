@@ -95,6 +95,7 @@ class CTnet(torch.nn.Module):
                 64,
                 input_skips=append_xyz,
             )
+            # self.mlp_cam_center=None
             self.decoder_input_size += 64*2
 
         else:
@@ -636,13 +637,10 @@ class CTnetAirMSPI(torch.nn.Module):
                 volume, query_points, query_indices = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
             else:
                 volume, query_points, query_indices = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
-            uv = cameras.project_points(query_indices, screen=True)
-
         else:
             volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
-            uv = cameras.project_points(None, screen=True)
-
         n_query = [points.shape[0] for points in query_points]
+        uv = cameras.project_points(query_indices,screen=True)
 
         # if self.mlp_cam_center:
         #     cam_centers = cameras.get_camera_center()

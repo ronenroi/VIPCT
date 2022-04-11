@@ -167,26 +167,36 @@ def main(cfg: DictConfig):
     masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']
     mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
     mapping_path = '/wdata/yaelsc/AirMSPI_raw_data/raw_data/voxel_pixel_list72x72x32_BOMEX_img350x350.pkl'
-    with open(mapping_path, 'rb') as f:
-        mapping = pickle.load(f)
-    image_size = [350, 350]
-    images_mapping_list = []
-    for _, map in mapping.items():
-        voxels_list = []
-        v = map.values()
-        voxels = np.array(list(v), dtype=object)
-        for i, voxel in enumerate(voxels):
-            if len(voxel) > 0:
-                pixels = np.unravel_index(voxel, np.array([350, 350]))
-                mean_px = np.mean(pixels, 1)
-                voxels_list.append(mean_px)
-            else:
-                voxels_list.append([-100000, -100000])
-        images_mapping_list.append(voxels_list)
-    images_mapping_list = [[np.array(map)[masks.ravel()] for map in images_mapping_list]]
+    mapping_path = '/wdata/roironen/Data/voxel_pixel_list72x72x32_BOMEX_img350x350_processed.pkl'
+    # with open(mapping_path, 'rb') as f:
+    #     mapping = pickle.load(f)
+    images_mapping_list = sio.loadmat(mapping_path)['map']
+    # image_size = [350, 350]
+    # images_mapping_list = []
+    # for _, map in mapping.items():
+    #     voxels_list = []
+    #     v = map.values()
+    #     voxels = np.array(list(v), dtype=object)
+    #     for i, voxel in enumerate(voxels):
+    #         if len(voxel) > 0:
+    #             pixels = np.unravel_index(voxel, np.array([350, 350]))
+    #             mean_px = np.mean(pixels, 1)
+    #             voxels_list.append(mean_px)
+    #         else:
+    #             voxels_list.append([-100000, -100000])
+    #     images_mapping_list.append(voxels_list)
+    # sio.savemat('/wdata/roironen/Data/voxel_pixel_list72x72x32_BOMEX_img350x350_processed.pkl', {'map':np.array(images_mapping_list)})
+    # indices = np.arange(masks.ravel().shape[0])#[masks.ravel()]
+    mean = cfg.data.mean
+    std = cfg.data.std
+    val_image -= mean
+    val_image /= std
+    images_mapping_list = [[np.array(map) for map in images_mapping_list]]
     masks = torch.tensor(masks,device=device)[None]
-    gx = np.linspace(-20*0.05,0.05 * 52,72, dtype=np.float32)
-    gy = np.linspace(-20*0.05, 0.05 * 52, 72, dtype=np.float32)
+    # gx = np.linspace(-20*0.05,0.05 * 52,72, dtype=np.float32)
+    # gy = np.linspace(-20*0.05, 0.05 * 52, 72, dtype=np.float32)
+    gx = np.linspace(0,0.05 * 72,72, dtype=np.float32)
+    gy = np.linspace(0, 0.05 * 72, 72, dtype=np.float32)
     gz = np.linspace(0, 0.04 * 32, 32, dtype=np.float32)
     grid = [np.array([gx,gy,gz])]
     val_volume = Volumes(torch.unsqueeze(torch.tensor(masks, device=device).float(), 1), grid)

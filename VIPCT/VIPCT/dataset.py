@@ -32,7 +32,8 @@ if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/D
 
 ALL_DATASETS = ("BOMEX_10cams_polarization", "BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams",
                 "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2",
-                "BOMEX_10cams_varyingV3", "BOMEX_10cams_varyingV4")
+                "BOMEX_10cams_varyingV3", "BOMEX_10cams_varyingV4",
+                "subset_of_seven_clouds")
 
 
 def trivial_collate(batch):
@@ -128,6 +129,10 @@ def get_cloud_datasets(
     elif dataset_name == 'BOMEX_32cams':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras')
         image_size = [116, 116]
+    elif dataset_name == 'subset_of_seven_clouds':
+        data_root = data_root.replace('home', 'wdata')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
+        image_size = [48, 48]
     else:
         data_root = os.path.join(data_root,'BOMEX_256x256x100_5000CCN_50m_micro_256/roi',dataset_name)
         image_size = [236, 236]
@@ -180,8 +185,11 @@ def get_cloud_datasets(
     dataset_name = dataset_name,
 
     )
-    if not dataset_name == 'BOMEX_CASS_10cams':
+    if not (dataset_name == 'BOMEX_CASS_10cams' or dataset_name == 'subset_of_seven_clouds'):
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
+    elif dataset_name == 'subset_of_seven_clouds':
+        val_paths = [f for f in glob.glob(os.path.join('/wdata/roironen/Data/subset_of_seven_clouds', "cloud*.pkl"))]
+        print(val_paths)
     else:
         val_paths = [f for f in glob.glob(os.path.join(data_root_cass, "test/cloud*.pkl"))]
         val_paths += [f for f in glob.glob(os.path.join(data_root_bomex, "test/cloud*.pkl"))]
@@ -236,6 +244,7 @@ class CloudDataset(Dataset):
 
     def __getitem__(self, idx):
         cloud_path = self.cloud_dir[idx]
+
         with open(cloud_path, 'rb') as f:
             data = pickle.load(f)
         images = data['images']
@@ -244,6 +253,8 @@ class CloudDataset(Dataset):
             mask = data['mask']
         elif self.mask_type == 'space_carving_morph':
             mask = data['mask_morph']
+        elif self.mask_type == 'space_carving_0.9':
+            mask = data['mask0.9']
         if 'varying' in self.dataset_name:
             index = torch.randperm(10)[0]
             cam_i = torch.arange(index,100,10)
@@ -259,13 +270,18 @@ class CloudDataset(Dataset):
             image_sizes = data['image_sizes'][cam_i]
         else:
             image_sizes = [image.shape for image in images]
-
         extinction = data['ext']
         grid = data['grid']
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
 
-
+        # if cloud_path == '/wdata/roironen/Data/subset_of_seven_clouds/cloud_results_BOMEX_13x25x36_28440.pkl':
+        #     import scipy.io as sio
+        #     images = sio.loadmat('/wdata/roironen/Data/subset_of_seven_clouds/satellites_images/satellites_images_28440.mat')['satellites_images']
+        #     images -= self.mean
+        #     images /= self.std
+        #     extinction = sio.loadmat('/wdata/roironen/Data/subset_of_seven_clouds/lwcs/cloud28440.mat')['GT']
+        #     mask = sio.loadmat('/wdata/roironen/Data/subset_of_seven_clouds/masks/mask_28440.mat')['CARVER']
 
         # train_ext.append(train_data['ext'])
 
@@ -302,12 +318,12 @@ def get_cloud_microphysics_datasets(
 
     if dataset_name == 'BOMEX_10cams_polarization':
         # data_root = '/wdata/yaelsc/Roi_ICCP22/CloudCT10sat_polarized_LWC_LOW_SC'
-        data_root = '/wdata/yaelsc/Roi_ICCP22/CloudCT10sat_polarized_LWC_NOISE/'
+        data_root = '/wdata/yaelsc/Roi_ICCP22/'
         image_size = [123, 123]
 
     if dataset_name == 'BOMEX_10cams_polarization':
         print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-        data_train_paths = [f for f in glob.glob(os.path.join(data_root, "*.pkl"))]
+        data_train_paths = [f for f in glob.glob(os.path.join(data_root, "CloudCT10sat_polarized_LWC_NOISE/*.pkl"))]
 
     train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
 
@@ -328,7 +344,7 @@ def get_cloud_microphysics_datasets(
 
     )
     if dataset_name == 'BOMEX_10cams_polarization':
-        val_paths = data_train_paths[:]
+        val_paths =  [f for f in glob.glob(os.path.join(data_root, "CloudCT10sat_polarized_LWC_NOISE_TEST/*.pkl"))]
 
     val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
     val_paths = val_paths[:val_len]
@@ -356,7 +372,10 @@ class MicrophysicsCloudDataset(Dataset):
 
     def __getitem__(self, idx):
         cloud_path = self.cloud_dir[idx]
-        data_root = os.path.join(DEFAULT_DATA_ROOT, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras', 'train')
+        if 'TEST' in cloud_path:
+            data_root = os.path.join(DEFAULT_DATA_ROOT, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras', 'test')
+        else:
+            data_root = os.path.join(DEFAULT_DATA_ROOT, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras', 'train')
         image_index = cloud_path.split('satellites_images_')[-1].split('.pkl')[0]
         projection_path = os.path.join(data_root, f"cloud_results_{image_index}.pkl")
         with open(cloud_path, 'rb') as f:
@@ -471,7 +490,7 @@ def get_airmspi_datasets(
         mean=mean,
         std=std,
     dataset_name = dataset_name,
-
+        drop_index = cfg.data.drop_index
     )
 
 
@@ -480,7 +499,7 @@ def get_airmspi_datasets(
 
 
 class AirMSPIDataset(Dataset):
-    def __init__(self, cloud_dir,image_dir, n_cam,mapping,  mask_type=None, mean=0, std=1, dataset_name=''):
+    def __init__(self, cloud_dir,image_dir, n_cam,mapping,  mask_type=None, mean=0, std=1, dataset_name='', drop_index=-1):
         self.cloud_dir = cloud_dir
         self.mapping = mapping
         self.image_dir = image_dir
@@ -489,6 +508,9 @@ class AirMSPIDataset(Dataset):
         self.mean = mean
         self.std = std
         self.dataset_name = dataset_name
+        self.drop_index = drop_index
+        if self.n_cam != 9 and self.drop_index>-1:
+            self.mapping.pop(drop_index)
 
     def __len__(self):
         return len(self.cloud_dir)
@@ -503,7 +525,8 @@ class AirMSPIDataset(Dataset):
             data = pickle.load(f)
         with open(image_dir, 'rb') as f:
             images = pickle.load(f)['images']
-
+        if self.n_cam!=9:
+            images = np.delete(images,self.drop_index,0)
         mask = None
         if self.mask_type == 'space_carving':
             mask = data['mask']

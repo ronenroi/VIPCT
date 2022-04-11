@@ -8,7 +8,7 @@ import hydra
 import numpy as np
 import torch
 from VIPCT.visualization import SummaryWriter
-from VIPCT.dataset import get_cloud_datasets, trivial_collate
+from VIPCT.dataset import get_cloud_microphysics_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf
@@ -101,12 +101,12 @@ def main(cfg: DictConfig):
     net_cfg = OmegaConf.load(resume_cfg_path)
     cfg=OmegaConf.merge(net_cfg,cfg)
     # DATA_DIR = os.path.join(current_dir, "data")
-    _, val_dataset, n_cam = get_cloud_datasets(
+    _, val_dataset, n_cam = get_cloud_microphysics_datasets(
         cfg=cfg
     )
 
     # Initialize the Radiance Field model.
-    model = CTnet(cfg=cfg, n_cam=n_cam)
+    model = CTnetMicrophysics(cfg=cfg, n_cam=n_cam)
 
     # Move the model to the relevant device.
 
@@ -167,7 +167,9 @@ def main(cfg: DictConfig):
 
     # Validation
     # loss_val = 0
-    relative_err= []
+    lwc_relative_err= []
+    reff_relative_err= []
+    veff_relative_err= []
     relative_mass_err = []
     batch_time_net = []
     val_i = 0
@@ -175,9 +177,10 @@ def main(cfg: DictConfig):
 
     # val_batch = next(val_dataloader.__iter__())
 
-        val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch  # [0]#.values()
+        val_image, microphysics, grid, image_sizes, projection_matrix, camera_center, masks = val_batch  # [0]#.values()
         val_image = torch.tensor(val_image, device=device).float()
-        val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
+        val_volume = Volumes(torch.tensor(microphysics, device=device).float(), grid)
+
         val_camera = PerspectiveCameras(image_size=image_sizes, P=torch.tensor(projection_matrix, device=device).float(),
                                         camera_center=torch.tensor(camera_center, device=device).float(), device=device)
         if model.val_mask_type == 'gt_mask':
@@ -188,7 +191,7 @@ def main(cfg: DictConfig):
     # Activate eval mode of the model (lets us do a full rendering pass).
         with torch.no_grad():
             est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(
-                val_volume.extinctions.shape[0], -1)
+                val_volume.extinctions.shape[0],val_volume.extinctions.shape[1], -1)
             n_points_mask = torch.sum(torch.stack(masks)*1.0) if isinstance(masks, list) else masks.sum()
             if n_points_mask > cfg.min_mask_points:
                 net_start_time = time.time()
@@ -208,7 +211,7 @@ def main(cfg: DictConfig):
                             est_vols[i][m] = out_vol.squeeze(1)
                 else:
                     for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
-                        est_vol[m]=out_vol.squeeze(1)#.reshape(m.shape)[m]
+                        est_vol[:,m]=out_vol.squeeze(1).T#.reshape(m.shape)[m]
                 time_net = time.time() - net_start_time
             else:
                 time_net = 0
@@ -219,18 +222,27 @@ def main(cfg: DictConfig):
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
             # est_vols[gt_vol==0] = 0
             est_vols[est_vols<0] = 0
+
+            est_lwc = est_vols[0]
+            est_reff = est_vols[1]
+            est_veff = est_vols[2]
+
+            gt_lwc = gt_vol[0]
+            gt_reff =  gt_vol[1]
+            gt_veff = gt_vol[2]
+
             # loss_val += err(est_vols, gt_vol)
             # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
-            print(f'{relative_error(ext_est=est_vols,ext_gt=gt_vol)}, {n_points_mask}')
+            print(f'LWC: {relative_error(ext_est=est_lwc,ext_gt=gt_lwc)}, {n_points_mask}')
+            print(f'Reff: {relative_error(ext_est=est_reff,ext_gt=gt_reff)}, {n_points_mask}')
+            print(f'Veff: {relative_error(ext_est=est_veff,ext_gt=gt_veff)}, {n_points_mask}')
             # if relative_error(ext_est=est_vols,ext_gt=gt_vol)>2:
             #     print()
-            if True:
-                import scipy.io as sio
-                val_image *= cfg.data.std
-                val_image += cfg.data.mean
-                sio.savemat(f'results_cloud_{val_i}.mat',{'gt':gt_vol.detach().cpu().numpy(),'est':est_vols.detach().cpu().numpy(), 'images': val_image.detach().cpu().numpy()})
-            relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
-            relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+
+            lwc_relative_err.append(relative_error(ext_est=est_lwc,ext_gt=gt_lwc).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            reff_relative_err.append(relative_error(ext_est=est_reff,ext_gt=gt_reff).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            veff_relative_err.append(relative_error(ext_est=est_veff,ext_gt=gt_veff).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            relative_mass_err.append(mass_error(ext_est=est_lwc,ext_gt=gt_lwc).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             batch_time_net.append(time_net)
             if False:
                 show_scatter_plot(gt_vol,est_vols)
@@ -245,17 +257,21 @@ def main(cfg: DictConfig):
 
 
     # loss_val /= (val_i + 1)
-    relative_err = np.array(relative_err)
+    lwc_relative_err = np.array(lwc_relative_err)
+    reff_relative_err = np.array(reff_relative_err)
+    veff_relative_err = np.array(veff_relative_err)
     relative_mass_err =np.array(relative_mass_err)
     batch_time_net = np.array(batch_time_net)
-    print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
-    masked = relative_err<2
-    relative_err1 = relative_err[masked]
-    print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
-
+    print(f'LWC: mean relative error {np.mean(lwc_relative_err)} with std of {np.std(lwc_relative_err)} for {(val_i + 1)} clouds')
+    print(f'Reff: mean relative error {np.mean(reff_relative_err)} with std of {np.std(reff_relative_err)} for {(val_i + 1)} clouds')
+    print(f'Veff: mean relative error {np.mean(veff_relative_err)} with std of {np.std(veff_relative_err)} for {(val_i + 1)} clouds')
+    # masked = veff_relative_err<2
+    # relative_err1 = relative_err[masked]
+    # print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
+    #
     print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
-    relative_mass_err1 = relative_mass_err[masked]
-    print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
+    # relative_mass_err1 = relative_mass_err[masked]
+    # print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
 
     print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')
     if writer:

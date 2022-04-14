@@ -258,6 +258,7 @@ def main(cfg: DictConfig):
     print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
 
     print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')
+    print(batch_time_net)
     if writer:
         writer._iter = iteration
         writer._dataset = 'val'#.format(val_i)

@@ -310,12 +310,14 @@ class AirMSPICameras(TensorProperties):
     def __init__(
             self,
             mapping: torch.tensor,
+            centers: torch.tensor=None,
             device: Device = "cpu"
     ):
 
         super().__init__(
             device=device,
             mapping=mapping,
+            centers=centers,
         )
 
         # if (self.image_size < 1).any():  # pyre-ignore
@@ -378,8 +380,50 @@ class AirMSPICameras(TensorProperties):
             points_out = [map[:,p,:] for map, p in zip([self.mapping], points)]
         else:
             points_out = [self.mapping]
+
         return points_out
 
+    def project_pointsv2(
+        self, points, eps: Optional[float] = None, screen: bool = False
+    ) -> (torch.Tensor,torch.Tensor):
+        """
+        Transforms points from world space to screen space.
+        Input points follow the SHDOM coordinate system conventions: +X[km] (North), +Y [km] (East), +Z[km] (Up).
+        Output points are in screen space: +X right, +Y down, origin at top left corner.
+
+        Args:
+            points: list of torch tensors, each of shape (..., 3).
+            eps: If eps!=None, the argument is used to clamp the
+                divisor in the homogeneous normalization of the points
+                transformed to the ndc space. Please see
+                `transforms.Transform3d.transform_points` for details.
+
+                For `CamerasBase.transform_points`, setting `eps > 0`
+                stabilizes gradients since it leads to avoiding division
+                by excessively low numbers for points close to the
+                camera plane.
+            screen: if True returns the projected points in pixels
+                    else in ndc space: X, Y in [-1 1]. For non square
+                    images, we scale the points such that largest side
+                    has range [-1, 1] and the smallest side has range
+                    [-u, u], with u < 1.
+
+        Returns
+            new_points: transformed points with the same shape as the input
+            except the last axis size is 2.
+        """
+        if points is not None:
+            points_out = []
+            pixel_centers = []
+            for map, center, p in zip([self.mapping],[self.centers], points):
+
+                pixel_centers.append(center[:,p.to(center.device),:])
+                points_out.append(map[:,p.to(map.device),:])
+        else:
+            points_out = [self.mapping]
+            pixel_centers = [self.centers]
+
+        return points_out, pixel_centers
 
     def clone(self):
         """

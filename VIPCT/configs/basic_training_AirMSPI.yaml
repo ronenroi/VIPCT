@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_AirMSPI_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10_no_nadir/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_AirMSPI_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10_no_nadir_Fcam/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 3
 debug: False

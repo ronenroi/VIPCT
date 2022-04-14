@@ -8,7 +8,7 @@ import hydra
 import numpy as np
 import torch
 from VIPCT.visualization import SummaryWriter
-from VIPCT.dataset import get_airmspi_datasets, trivial_collate
+from VIPCT.dataset import get_airmspi_datasetsV2, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
@@ -44,12 +44,12 @@ def main(cfg: DictConfig):
     # Load the training/validation data.
     current_dir = os.path.dirname(os.path.realpath(__file__))
     # DATA_DIR = os.path.join(current_dir, "data")
-    train_dataset, val_dataset, n_cam = get_airmspi_datasets(
+    train_dataset, val_dataset, n_cam = get_airmspi_datasetsV2(
         cfg=cfg
     )
 
     # Initialize the CT model.
-    model = CTnetAirMSPI(cfg=cfg, n_cam=n_cam)
+    model = CTnetAirMSPIv2(cfg=cfg, n_cam=n_cam)
 
     # Move the model to the relevant device.
     model.to(device)
@@ -176,7 +176,7 @@ def main(cfg: DictConfig):
             images = torch.tensor(images, device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
             cameras = AirMSPICameras(mapping=torch.tensor(mapping, device=device).float(),
-                                     centers=centers,
+                                     centers=torch.tensor(centers, device=device).float(),
                                          device=device)
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
             if model.mask_type == 'gt_mask':

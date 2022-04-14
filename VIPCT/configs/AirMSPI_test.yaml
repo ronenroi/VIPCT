@@ -4,7 +4,7 @@ hydra:
 seed: 3
 debug: False
 gpu: 3
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-09_AirMSPI_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10/17-07-20/checkpoints/cp_50000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-09_AirMSPI_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10/17-07-20/checkpoints/cp_55000.pth'
 data:
   dataset_name: 'AirMSPI'
 #  image_size: [261, 261] # [height, width]

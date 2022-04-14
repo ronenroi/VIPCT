@@ -164,7 +164,8 @@ def main(cfg: DictConfig):
     batch_time_net = []
     val_images = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/croped_airmspi_9images_for_Roi.mat')['croped_airmspi_images']
     val_image = torch.tensor(val_images,device=device).float()[None]
-    masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']
+    # masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']
+    masks = sio.loadmat('/wdata/roironen/Data/mask_72x72x32_vox50x50x40mROI.mat')['mask']
     mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
     mapping_path = '/wdata/yaelsc/AirMSPI_raw_data/raw_data/voxel_pixel_list72x72x32_BOMEX_img350x350.pkl'
     mapping_path = '/wdata/roironen/Data/voxel_pixel_list72x72x32_BOMEX_img350x350_processed.pkl'

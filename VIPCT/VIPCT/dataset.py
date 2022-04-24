@@ -421,7 +421,7 @@ class MicrophysicsCloudDataset(Dataset):
         #     label = self.target_transform(label)
         return images, microphysics, grid, image_sizes, projection_matrix, camera_center, mask
 
-ALL_DATASETS_AIRMSPI = ("BOMEX_9cams")
+ALL_DATASETS_AIRMSPI = ("BOMEX_9cams", "BOMEX_9cams_varying")
 
 def get_airmspi_datasets(
     cfg,
@@ -448,7 +448,14 @@ def get_airmspi_datasets(
 
     if dataset_name == 'BOMEX_9cams':
         data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-        image_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/AirMSPI/LOW_SC/AIRMSPI_IMAGES_LWC_LOW_SC'
+        image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC_NOISY_PROJ/'
+        mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
+        with open(mapping_path, 'rb') as f:
+            mapping = pickle.load(f)
+        image_size = [350, 350]
+    elif dataset_name == 'BOMEX_9cams_varying':
+        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
+        image_root = '/wdata/roironen/Data/AirMSPINEW/'
         mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
         with open(mapping_path, 'rb') as f:
             mapping = pickle.load(f)
@@ -471,7 +478,7 @@ def get_airmspi_datasets(
                 voxels_list.append([-100000,-100000])
         images_mapping_list.append(voxels_list)
 
-    pixel_centers = sio.loadmat('/wdata/roironen/Data/pixel_centers.mat')['xpc']
+    #pixel_centers = sio.loadmat('/wdata/roironen/Data/pixel_centers.mat')['xpc']
     print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
     image_train_paths = [f for f in glob.glob(os.path.join(image_root, "*.pkl"))]
     cloud_train_path = data_root
@@ -493,7 +500,7 @@ def get_airmspi_datasets(
         std=std,
     dataset_name = dataset_name,
         drop_index = cfg.data.drop_index,
-        pixel_centers=pixel_centers
+        #pixel_centers=pixel_centers
     )
 
 
@@ -514,7 +521,7 @@ class AirMSPIDataset(Dataset):
         self.drop_index = drop_index
         if self.n_cam != 9 and self.drop_index>-1:
             self.mapping.pop(drop_index)
-            self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,0)
+            #self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,0)
 
     def __len__(self):
         return len(self.cloud_dir)

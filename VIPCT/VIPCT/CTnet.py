@@ -915,7 +915,7 @@ class CTnetAirMSPIv2(torch.nn.Module):
                 embed_camera_center = embed_camera_center#.unsqueeze(1).expand(-1,int(latent.shape[0]/Vbatch),-1,-1)
                 # embed_camera_center = embed_camera_center.reshape(-1,*embed_camera_center.shape[2:])
                 latent = torch.split(latent,n_query)
-                latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
+                latent = torch.vstack([torch.cat([lat, embed.transpose(0, 1)], -1) for lat, embed in zip(latent, embed_camera_center)])
                 del embed_camera_center
 
             if self._feature_encoder:

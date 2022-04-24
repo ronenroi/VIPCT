@@ -13,7 +13,7 @@ from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
-from VIPCT.cameras import AirMSPICameras
+from VIPCT.cameras import AirMSPICameras, AirMSPICamerasV2
 # from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
@@ -175,8 +175,8 @@ def main(cfg: DictConfig):
 
             images = torch.tensor(images, device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
-            cameras = AirMSPICameras(mapping=torch.tensor(mapping, device=device).float(),
-                                     centers=torch.tensor(centers, device=device).float(),
+            cameras = AirMSPICamerasV2(mapping=torch.tensor(mapping).float(),
+                                     centers=torch.tensor(centers).float(),
                                          device=device)
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
             if model.mask_type == 'gt_mask':

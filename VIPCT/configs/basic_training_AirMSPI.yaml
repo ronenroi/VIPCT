@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_AirMSPI_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10_no_nadir_Fcam/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_AirMSPI_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10_varying/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 3
 debug: False
@@ -15,8 +15,8 @@ data:
 #  image_size: [116, 116] # [height, width]
   n_training: -1
   n_val: 40
-  n_cam: 8
-  drop_index: 2
+  n_cam: 9
+  drop_index: -1
   rand_cam: False
   mean: 0.017
   std: 0.0072
@@ -60,7 +60,7 @@ backbone:
   sampling_support: 6
   sampling_output_size: 18
   out_channels: 64
-  n_sampling_nets: 8
+  n_sampling_nets: 9
   feature_flatten: False
   modify_first_layer: True
 decoder:

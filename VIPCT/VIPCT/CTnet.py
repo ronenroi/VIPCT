@@ -930,6 +930,8 @@ class CTnetAirMSPIv2(torch.nn.Module):
             n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / self.val_n_query))
             uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
             query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
+            embed_camera_center = torch.chunk(embed_camera_center, n_chunk, dim=2) if embed_camera_center is not None else None
+
             output = [torch.empty(0,device=image_features[0].device)] * len(n_query)
             for chunk in range(n_chunk):
                 uv_chunk = [p[chunk] for p in uv]
@@ -944,8 +946,10 @@ class CTnetAirMSPIv2(torch.nn.Module):
                     del query_points_chunk
                 if embed_camera_center is not None:
                     assert Vbatch == 1
-                    embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1, int(latent_chunk.shape[0] / Vbatch), -1, -1)
-                    embed_camera_center_chunk = embed_camera_center_chunk.reshape(-1, *embed_camera_center_chunk.shape[2:])
+                    embed_camera_center_chunk = embed_camera_center[chunk][0]
+                    # embed_camera_center_chunk = embed_camera_center_chunk.unsqueeze(1).expand(-1, int(latent_chunk.shape[0] / Vbatch), -1,-1)
+                    # embed_camera_center_chunk = embed_camera_center_chunk.reshape(-1, *embed_camera_center_chunk.shape[2:])
+                    embed_camera_center_chunk = embed_camera_center_chunk.transpose(0, 1)
                     latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
                 if self._feature_encoder:

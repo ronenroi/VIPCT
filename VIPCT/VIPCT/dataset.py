@@ -694,3 +694,161 @@ class AirMSPIDatasetV2(Dataset):
 
 
         return images, extinction, grid, images_mapping_list, pixel_centers, mask
+
+
+
+
+def get_airmspi_datasetsV2_varying(
+    cfg,
+    data_root: str = DEFAULT_DATA_ROOT,
+) -> Tuple[Dataset, Dataset, int]:
+    """
+    Obtains the training and validation dataset object for a dataset specified
+    with the `dataset_name` argument.
+
+    Args:
+        dataset_name: The name of the dataset to load.
+        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
+        data_root: The root folder at which the data is stored.
+
+    Returns:
+        train_dataset: The training dataset object.
+        val_dataset: The validation dataset object.
+        test_dataset: The testing dataset object.
+    """
+    dataset_name = cfg.data.dataset_name
+
+    if dataset_name not in ALL_DATASETS_AIRMSPI:
+        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
+
+    if dataset_name == 'BOMEX_9cams':
+        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
+        image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/'
+        # mapping_paths = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebat_voxel_pixel_list32x32x32_BOMEX_img350x350_20160826_104727Z_SouthAtlanticOcean-14S19W.pkl'
+        mapping_paths = [f for f in glob.glob('/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebat_voxel_pixel_list32x32x32_BOMEX_img350x350*.pkl')]
+        pixel_center_paths = [f for f in glob.glob('/wdata/roironen/Data/AirMSPI-Varying/training/*.mat')]
+        image_size = [350, 350]
+    else:
+        NotImplementedError()
+    # images_mapping_lists = []
+    # pixel_centers_lists = []
+    # for mapping_path, pixel_center_path in zip(mapping_paths, pixel_center_paths):
+    #     with open(mapping_path, 'rb') as f:
+    #         mapping = pickle.load(f)
+    #     images_mapping_list = []
+    #     pixel_centers_list = []
+    #     pixel_centers = sio.loadmat(pixel_center_path)['xpc']
+    #     camera_ind = 0
+    #     for _, map in mapping.items():
+    #         voxels_list = []
+    #         pixel_list = []
+    #         v = map.values()
+    #         voxels = np.array(list(v),dtype=object)
+    #         for i, voxel in enumerate(voxels):
+    #             if len(voxel)>0:
+    #                 pixels = np.unravel_index(voxel, np.array(image_size))
+    #                 mean_px = np.mean(pixels,1)
+    #                 voxels_list.append(mean_px)
+    #                 pixel_list.append(pixel_centers[camera_ind,:,int(mean_px[0]),int(mean_px[1])])
+    #             else:
+    #                 voxels_list.append([-100000,-100000])
+    #                 pixel_list.append([-10000, -10000, -10000])
+    #
+    #         camera_ind += 1
+    #         images_mapping_list.append(voxels_list)
+    #         pixel_centers_list.append(pixel_list)
+    #     images_mapping_lists.append((images_mapping_list))
+    #     pixel_centers_lists.append(pixel_centers_list)
+    # print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
+    # with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl', 'wb') as f:
+    #     pickle.dump(images_mapping_lists, f, pickle.HIGHEST_PROTOCOL)
+    # with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl', 'wb') as f:
+    #     pickle.dump(pixel_centers_lists, f, pickle.HIGHEST_PROTOCOL)
+    with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl', 'rb') as f:
+        images_mapping_lists = pickle.load(f)
+    with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl', 'rb') as f:
+        pixel_centers_lists = pickle.load(f)
+    image_train_paths = [f for f in glob.glob(os.path.join(image_root, "SIMULATED_AIRMSPI_TRAIN*"))]
+    image_train_paths = [glob.glob(os.path.join(f, "*.pkl")) for f in image_train_paths]
+
+    cloud_train_path = data_root
+    assert cfg.data.n_training<=0
+    # train_len = cfg.data.n_training if cfg.data.n_training>0 else len(image_train_paths)
+
+    # image_train_paths = image_train_paths[:train_len]
+    # cloud_train_paths = cloud_train_paths[:train_len]
+    n_cam = cfg.data.n_cam
+    mean = cfg.data.mean
+    std = cfg.data.std
+    # rand_cam = cfg.data.rand_cam
+    train_dataset = AirMSPIDatasetV2_varying(
+            cloud_train_path,
+        image_train_paths,
+        mapping=images_mapping_lists,
+        n_cam=n_cam,
+        mask_type=cfg.ct_net.mask_type,
+        mean=mean,
+        std=std,
+    dataset_name = dataset_name,
+        drop_index = cfg.data.drop_index,
+        pixel_centers=pixel_centers_lists
+    )
+
+
+
+    return train_dataset, train_dataset,  n_cam
+
+
+class AirMSPIDatasetV2_varying(Dataset):
+    def __init__(self, cloud_dir,image_dir, n_cam,mapping, pixel_centers, mask_type=None, mean=0, std=1, dataset_name='', drop_index=-1):
+        self.cloud_dir = cloud_dir
+        self.mapping = mapping
+        self.image_dir = image_dir
+        self.mask_type = mask_type
+        self.n_cam = n_cam
+        self.mean = mean
+        self.std = std
+        self.dataset_name = dataset_name
+        self.pixel_centers = pixel_centers
+        self.drop_index = drop_index
+        if self.n_cam != 9 and self.drop_index>-1:
+            for map in self.mapping:
+                map.pop(drop_index)
+            self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,1)
+
+    def __len__(self):
+        return len(self.cloud_dir)
+
+    def __getitem__(self, idx):
+        geometry_ind = np.random.randint(len(self.image_dir))
+        image_dir = self.image_dir[geometry_ind][idx]
+        image_index = image_dir.split('satellites_images_')[-1].split('.pkl')[0]
+        cloud_path = os.path.join(self.cloud_dir, f"cloud_results_{image_index}.pkl")
+
+
+        with open(cloud_path, 'rb') as f:
+            data = pickle.load(f)
+        with open(image_dir, 'rb') as f:
+            images = pickle.load(f)['images']
+        if self.n_cam!=9:
+            images = np.delete(images,self.drop_index,0)
+        mask = None
+        if self.mask_type == 'space_carving':
+            mask = data['mask']
+        elif self.mask_type == 'space_carving_morph':
+            mask = data['mask_morph']
+        images -= self.mean
+        images /= self.std
+        grid = data['grid']
+        # grid = data['net_grid']
+        # if hasattr(data, 'image_sizes'):
+        #     image_sizes = data['image_sizes']
+        # else:
+        #     image_sizes = [image.shape for image in images]
+        extinction = data['ext'] / 10
+
+        images_mapping_list = [ np.array(map)[mask.ravel()] for map in self.mapping[geometry_ind]]
+        pixel_centers = [ np.array(centers)[mask.ravel()] for centers in self.pixel_centers[geometry_ind]]
+
+
+        return images, extinction, grid, images_mapping_list, pixel_centers, mask

@@ -89,6 +89,53 @@ class MLPWithInputSkips(torch.nn.Module):
             y = layer(y)
         return y
 
+class MLPIdentity(torch.nn.Module):
+    """
+    Implements the multi-layer perceptron architecture of the Neural Radiance Field.
+
+    As such, `MLPWithInputSkips` is a multi layer perceptron consisting
+    of a sequence of linear layers with ReLU activations.
+
+    Additionally, for a set of predefined layers `input_skips`, the forward pass
+    appends a skip tensor `z` to the output of the preceding layer.
+
+    Note that this follows the architecture described in the Supplementary
+    Material (Fig. 7) of [1].
+
+    References:
+        [1] Ben Mildenhall and Pratul P. Srinivasan and Matthew Tancik
+            and Jonathan T. Barron and Ravi Ramamoorthi and Ren Ng:
+            NeRF: Representing Scenes as Neural Radiance Fields for View
+            Synthesis, ECCV2020
+    """
+
+    def __init__(
+        self,
+
+    ):
+        """
+        Args:
+            n_layers: The number of linear layers of the MLP.
+            input_dim: The number of channels of the input tensor.
+            skip_dim: The number of channels of the tensor `z` appended when
+                evaluating the skip layers.
+            hidden_dim: The number of hidden units of the MLP.
+            input_skips: The list of layer indices at which we append the skip
+                tensor `z`.
+        """
+        super().__init__()
+
+
+    def forward(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: The input tensor of shape `(..., input_dim)`.
+            z: The input skip tensor of shape `(..., skip_dim)` which is appended
+                to layers whose indices are specified by `input_skips`.
+        Returns:
+            y: The output tensor of shape `(..., output_dim)`.
+        """
+        return x
 
 class MLPWithInputSkips2(torch.nn.Module):
     """

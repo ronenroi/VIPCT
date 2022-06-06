@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 import torch
 from .cameras import PerspectiveCameras, AirMSPICameras
 
-from .mlp_function import MLPWithInputSkips
+from .mlp_function import MLPWithInputSkips, MLPIdentity
 from .encoder import Backbone
 from .decoder import Decoder
 from .feature_encoding import FeatureEncoding
@@ -80,23 +80,28 @@ class CTnet(torch.nn.Module):
         self.decoder_input_size = self._image_encoder.latent_size
         # self.mask_net = MaskGenerator()
 
-        if n_layers_xyz:
-            self.mlp_xyz = MLPWithInputSkips(
-                n_layers_xyz,
-                3, #self.harmonic_embedding.embedding_dim_xyz,
-                3,#self.harmonic_embedding.embedding_dim_xyz,
-                64,
-                input_skips=append_xyz,
-            )
-            self.mlp_cam_center = MLPWithInputSkips(
-                n_layers_xyz,
-                3,  # self.harmonic_embedding.embedding_dim_xyz,
-                3,  # self.harmonic_embedding.embedding_dim_xyz,
-                64,
-                input_skips=append_xyz,
-            )
-            # self.mlp_cam_center=None
-            self.decoder_input_size += 64*2
+        if n_layers_xyz>0:
+            if n_layers_xyz>1:
+                self.mlp_xyz = MLPWithInputSkips(
+                    n_layers_xyz,
+                    3, #self.harmonic_embedding.embedding_dim_xyz,
+                    3,#self.harmonic_embedding.embedding_dim_xyz,
+                    cfg.ct_net.n_hidden_neurons_xyz,
+                    input_skips=append_xyz,
+                )
+                self.mlp_cam_center = MLPWithInputSkips(
+                    n_layers_xyz,
+                    3,  # self.harmonic_embedding.embedding_dim_xyz,
+                    3,  # self.harmonic_embedding.embedding_dim_xyz,
+                    cfg.ct_net.n_hidden_neurons_dir,
+                    input_skips=append_xyz,
+                )
+                # self.mlp_cam_center=None
+                self.decoder_input_size += cfg.ct_net.n_hidden_neurons_dir + cfg.ct_net.n_hidden_neurons_xyz
+            else:
+                self.mlp_xyz = MLPIdentity()
+                self.mlp_cam_center = MLPIdentity()
+                self.decoder_input_size += 6
 
         else:
             self.mlp_xyz = None
@@ -162,12 +167,9 @@ class CTnet(torch.nn.Module):
 
         image_features = self._image_encoder(image)
         import time
-        tic = time.time()
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
 
-        print(f'feature extractor {time.time() - tic}')
         del image
-        tic = time.time()
 
         # mask = self.mask_net(image_features)
         if self.training:
@@ -179,9 +181,7 @@ class CTnet(torch.nn.Module):
             volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
         n_query = [points.shape[0] for points in query_points]
         uv = cameras.project_points(query_points,screen=True)
-        print(f'get uv {time.time() - tic}')
 
-        tic = time.time()
 
         if self.mlp_cam_center:
             cam_centers = cameras.get_camera_center()
@@ -195,7 +195,6 @@ class CTnet(torch.nn.Module):
             query_points = self.mlp_xyz(query_points, query_points)
         else:
             query_points = None
-        print(f'embedding {time.time() - tic}')
 
         if self.training:
 
@@ -233,11 +232,11 @@ class CTnet(torch.nn.Module):
             for chunk in range(n_chunk):
                 uv_chunk = [p[chunk] for p in uv]
                 n_split = [points.shape[1] for points in uv_chunk]
-                tic = time.time()
+                # tic = time.time()
 
                 latent_chunk = self._image_encoder.sample_roi(image_features, uv_chunk)#.transpose(1, 2)
-                print(f'sample {time.time() - tic}')
-                tic = time.time()
+                # print(f'sample {time.time() - tic}')
+                # tic = time.time()
 
                 latent_chunk = torch.vstack(latent_chunk).transpose(0, 1)
                 if query_points is not None:
@@ -257,7 +256,7 @@ class CTnet(torch.nn.Module):
                 output_chunk = self.decoder(latent_chunk)
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
-                print(f'decoder {time.time() - tic}')
+                # print(f'decoder {time.time() - tic}')
 
             out = {"output": output, "volume": volume, 'query_indices': query_indices}
         # del uv

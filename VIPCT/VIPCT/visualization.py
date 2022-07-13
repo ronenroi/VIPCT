@@ -1,8 +1,23 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
+
+# This file contains auxiliry code for result visualization.
+# It is based on pySHDOM source code ('https://github.com/aviadlevis/pyshdom') by Aviad Levis
+# Copyright (c) Aviad Levis et al.
+# All rights reserved.
+
+# You are very welcome to use this code. For this, clearly acknowledge
+# the source of this code, and cite the paper that describes the readme file:
+# Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
+# Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
+#
+# Copyright (c) Roi Ronen. The python code is available for
+# non-commercial use and exploration.  For commercial use contact the
+# author. The author is not liable for any damages or loss that might be
+# caused by use or connection to this code.
 # All rights reserved.
 #
-# This source code is licensed under the BSD-style license found in the
+# This source code is licensed under the Apache License 2.0 found in the
 # LICENSE file in the root directory of this source tree.
+
 
 from typing import List, Optional, Tuple
 

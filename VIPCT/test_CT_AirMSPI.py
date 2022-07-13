@@ -1,4 +1,4 @@
-# This file contains the main script for VIP-CT evaluation on AirMSPI data.
+# This file contains an old script for VIP-CT evaluation on AirMSPI data.
 # You are very welcome to use this code. For this, clearly acknowledge
 # the source of this code, and cite the paper that describes the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",

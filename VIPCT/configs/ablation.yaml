@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets10_LARESAMPLER/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets10/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 3
 debug: False
@@ -48,7 +48,7 @@ backbone:
   upsample_interp: 'bilinear'
   feature_scale: 1.0
   use_first_pool: 'batch'
-  sampling_support: 11
+  sampling_support: 3
   sampling_output_size: 9
   out_channels: 512
   n_sampling_nets: 10

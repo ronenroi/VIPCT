@@ -4,11 +4,9 @@ hydra:
 seed: 3
 debug: False
 gpu: 3
-#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-04_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets10_50m/16-47-25/checkpoints/cp_155000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-06_BOMEX_Res50_FPN_256channels_Sampl_3_9_32cams_L2_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets32_50m_A/00-32-09/checkpoints/cp_100000.pth'
-#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-10_Microphysics_BOMEX_Res50_FPN_128channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_nets10/14-45-38/checkpoints/cp_150000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-04-04_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCT_wd1.0e-05_n_sampling_nets10_50m/16-47-25/checkpoints/cp_155000.pth'
 data:
-  dataset_name: 'subset_of_seven_clouds'
+  dataset_name: 'BOMEX_10cams'
 #  image_size: [261, 261] # [height, width]
   n_val: -1
 #backbone:

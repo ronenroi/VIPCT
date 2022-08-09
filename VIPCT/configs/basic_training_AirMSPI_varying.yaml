@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_AirMSPIv2_varying_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_150_ext_div10_NOIMG2/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_AirMSPIv2_varying_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_150_ext_div10_NOIMG7/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 3
 debug: False
@@ -15,7 +15,7 @@ data:
   n_training: -1
   n_val: 40
   n_cam: 8
-  drop_index: 2
+  drop_index: 7
   rand_cam: False
   mean: 0.017
   std: 0.0072

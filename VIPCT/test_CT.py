@@ -30,6 +30,7 @@ from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
+L2_error = lambda ext_est, ext_gt, eps=1e-6 : torch.sum((ext_est.view(-1) - ext_gt.view(-1))**2) / (torch.sum((ext_gt.view(-1))**2) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
@@ -154,7 +155,7 @@ def main(cfg: DictConfig):
     #     optimizer.last_epoch = start_epoch
 
     # Init the stats object.
-    stats = Stats(["loss", "relative_error", "lr", "max_memory", "sec/it"])
+    stats = Stats(["loss", "relative_error", "L2_error", "lr", "max_memory", "sec/it"])
 
 
     # The validation dataloader is just an endless stream of random samples.
@@ -183,6 +184,7 @@ def main(cfg: DictConfig):
     # Validation
     # loss_val = 0
     relative_err= []
+    l2_err = []
     relative_mass_err = []
     batch_time_net = []
     val_i = 0
@@ -236,7 +238,7 @@ def main(cfg: DictConfig):
             est_vols[est_vols<0] = 0
             # loss_val += err(est_vols, gt_vol)
             # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
-            print(f'{relative_error(ext_est=est_vols,ext_gt=gt_vol)}, {n_points_mask}')
+            print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, L2 = {L2_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
             # if relative_error(ext_est=est_vols,ext_gt=gt_vol)>2:
             #     print()
             if True:
@@ -245,6 +247,7 @@ def main(cfg: DictConfig):
                 val_image += cfg.data.mean
                 sio.savemat(f'results_cloud_{val_i}.mat',{'gt':gt_vol.detach().cpu().numpy(),'est':est_vols.detach().cpu().numpy(), 'images': val_image.detach().cpu().numpy()})
             relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+            l2_err.append(L2_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
             batch_time_net.append(time_net)
             if False:
@@ -261,18 +264,24 @@ def main(cfg: DictConfig):
 
     # loss_val /= (val_i + 1)
     relative_err = np.array(relative_err)
+    l2_err = np.array(l2_err)
     relative_mass_err =np.array(relative_mass_err)
     batch_time_net = np.array(batch_time_net)
     print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
+    print(f'mean L2 error {np.mean(l2_err)} with std of {np.std(l2_err)} for {(val_i + 1)} clouds')
     masked = relative_err<2
     relative_err1 = relative_err[masked]
+    l2_err1 = l2_err[masked]
     print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
+    print(f'mean L2 error w/o outliers {np.mean(l2_err1)} with std of {np.std(l2_err1)} for {l2_err1.shape[0]} clouds')
 
     print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
     relative_mass_err1 = relative_mass_err[masked]
     print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
 
     print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')
+
+    np.save()
     # print(batch_time_net)
     if writer:
         writer._iter = iteration

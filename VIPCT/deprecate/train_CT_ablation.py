@@ -1,6 +1,6 @@
-# This file contains the main script for VIP-CT training on AirMSPI data.
+# This file contains the main script for VIP-CT ablations.
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -23,12 +23,11 @@ import hydra
 import numpy as np
 import torch
 from VIPCT.visualization import SummaryWriter
-from VIPCT.dataset import get_airmspi_datasetsV2_varying, trivial_collate
+from VIPCT.dataset import get_cloud_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
-from VIPCT.cameras import AirMSPICameras, AirMSPICamerasV2
 # from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
@@ -36,7 +35,7 @@ mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
 
-@hydra.main(config_path=CONFIG_DIR, config_name="basic_training_AirMSPI_varying")
+@hydra.main(config_path=CONFIG_DIR, config_name="ablation")
 def main(cfg: DictConfig):
 
     # Set the relevant seeds for reproducibility.
@@ -59,12 +58,12 @@ def main(cfg: DictConfig):
     # Load the training/validation data.
     current_dir = os.path.dirname(os.path.realpath(__file__))
     # DATA_DIR = os.path.join(current_dir, "data")
-    train_dataset, val_dataset, n_cam = get_airmspi_datasetsV2_varying(
+    train_dataset, val_dataset, n_cam = get_cloud_datasets(
         cfg=cfg
     )
 
     # Initialize the CT model.
-    model = CTnetAirMSPIv2(cfg=cfg, n_cam=n_cam)
+    model = CTnet(cfg=cfg, n_cam=n_cam)
 
     # Move the model to the relevant device.
     model.to(device)
@@ -149,7 +148,7 @@ def main(cfg: DictConfig):
         train_dataset,
         batch_size=cfg.optimizer.batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=4,
         collate_fn=trivial_collate,
     )
 
@@ -157,7 +156,7 @@ def main(cfg: DictConfig):
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=1,
-        num_workers=0,
+        num_workers=4,
         collate_fn=trivial_collate,
         # sampler=torch.utils.data.RandomSampler(
         #     val_dataset,
@@ -186,13 +185,12 @@ def main(cfg: DictConfig):
                 # Adjust the learning rate.
                 lr_scheduler.step()
 
-            images, extinction, grid, mapping, centers, masks = batch#[0]#.values()
+            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
 
             images = torch.tensor(images, device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
-            cameras = AirMSPICamerasV2(mapping=torch.tensor(mapping).float(),
-                                     centers=torch.tensor(centers).float(),
-                                         device=device)
+            cameras = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),
+                                         camera_center= torch.tensor(camera_center, device=device).float(), device=device)
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
             if model.mask_type == 'gt_mask':
                 masks = volume.extinctions > volume._ext_thr
@@ -275,11 +273,11 @@ def main(cfg: DictConfig):
 
                 # val_batch = next(val_dataloader.__iter__())
 
-                    val_image, extinction, grid, mapping, masks = val_batch#[0]#.values()
+                    val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch#[0]#.values()
                     val_image = torch.tensor(val_image, device=device).float()
                     val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
-                    val_camera = AirMSPICameras(mapping=torch.tensor(mapping, device=device).float(),
-                                         device=device)
+                    val_camera = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),
+                                         camera_center= torch.tensor(camera_center, device=device).float(), device=device)
                     masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
                     if model.val_mask_type == 'gt_mask':
                         masks = val_volume.extinctions > val_volume._ext_thr

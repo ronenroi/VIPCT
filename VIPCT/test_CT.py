@@ -1,6 +1,6 @@
 # This file contains the main script for VIP-CT evaluation.
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite our paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -17,81 +17,33 @@ import collections
 import os, time
 import pickle
 import warnings
-# import sys
-# sys.path.insert(0, '/home/roironen/pytorch3d/projects/')
 import hydra
 import numpy as np
 import torch
-from VIPCT.visualization import SummaryWriter
 from VIPCT.dataset import get_cloud_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-import matplotlib.pyplot as plt
+from VIPCT.util.plot_util import *
+from VIPCT.visualization import SummaryWriter
+import scipy.io as sio
+
+# error criteria
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 L2_error = lambda ext_est, ext_gt, eps=1e-6 : torch.sum((ext_est.view(-1) - ext_gt.view(-1))**2) / (torch.sum((ext_gt.view(-1))**2) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
+
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
-def show_scatter_plot(gt_param, est_param):
-    gt_param = gt_param.detach().cpu().numpy().ravel()
-    est_param = est_param.detach().cpu().numpy().ravel()
-    max_val = max(gt_param.max(), est_param.max())
-    fig, ax = plt.subplots()
-    ax.scatter(gt_param, est_param, facecolors='none', edgecolors='b')
-    ax.set_xlim([0, 1.1 * max_val])
-    ax.set_ylim([0, 1.1 * max_val])
-    ax.plot(ax.get_xlim(), ax.get_ylim(), c='r', ls='--')
-    ax.set_ylabel('Estimated', fontsize=14)
-    ax.set_xlabel('True', fontsize=14)
-    ax.set_aspect('equal')
-    plt.show()
-
-def show_scatter_plot_altitute(gt_param, est_param):
-    import matplotlib.cm as cm
-    gt_param = gt_param.detach().cpu().numpy()
-    est_param = est_param.detach().cpu().numpy()
-    colors = cm.rainbow(np.linspace(0, 1, gt_param.shape[-1]))
-
-    max_val = max(gt_param.max(), est_param.max())
-    fig, ax = plt.subplots()
-    for i, c in enumerate(colors):
-        if i>10:
-            ax.scatter(gt_param[...,i].ravel(), est_param[...,i].ravel(),
-                   facecolors='none', edgecolors=c, label=i)
-        else:
-            ax.scatter(gt_param[..., i].ravel(), est_param[..., i].ravel(),
-                       facecolors='none', edgecolors=c)
-    ax.set_xlim([0, 1.1 * max_val])
-    ax.set_ylim([0, 1.1 * max_val])
-    ax.legend(loc='best',fontsize='small')
-    ax.plot(ax.get_xlim(), ax.get_ylim(), c='r', ls='--')
-    ax.set_ylabel('Estimated', fontsize=14)
-    ax.set_xlabel('True', fontsize=14)
-    ax.set_aspect('equal')
-    plt.show()
-
-def volume_plot(gt_param, est_param):
-    gt_param = gt_param.detach().cpu().numpy()
-    est_param = est_param.detach().cpu().numpy()
-    ax = plt.figure().add_subplot(projection='3d')
-    plt.title("GT")
-    ax.voxels(gt_param)
-    plt.show()
-    ax = plt.figure().add_subplot(projection='3d')
-    plt.title("Est.")
-    ax.voxels(est_param)
-    plt.show()
-
-@hydra.main(config_path=CONFIG_DIR, config_name="basic_test")
+@hydra.main(config_path=CONFIG_DIR, config_name="vip-ct_test")
 def main(cfg: DictConfig):
 
-    # Set the relevant seeds for reproducibility.
+    # Set the relevant seeds for reproducibility
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
 
-    # Device on which to run.
+    # Device on which to run
     if torch.cuda.is_available() and cfg.debug == False:
         n_device = torch.cuda.device_count()
         cfg.gpu = 0 if n_device==1 else cfg.gpu
@@ -102,61 +54,37 @@ def main(cfg: DictConfig):
             + "the training is unlikely to finish in reasonable time."
         )
         device = "cpu"
-        # Init the visualization visdom env.
+
     log_dir = os.getcwd()
     log_dir = log_dir.replace('outputs','test_results')
-    writer = None #SummaryWriter(log_dir)
-    results_dir = log_dir #os.path.join(log_dir, 'test_results')
+
+    results_dir = log_dir
     checkpoint_resume_path = os.path.join(hydra.utils.get_original_cwd(), cfg.checkpoint_resume_path)
     if len(results_dir) > 0:
-        # Make the root of the experiment directory.
-        # checkpoint_dir = os.path.split(checkpoint_path)
+        # Make the root of the experiment directory
         os.makedirs(results_dir, exist_ok=True)
 
     resume_cfg_path = os.path.join(checkpoint_resume_path.split('/checkpoints')[0],'.hydra/config.yaml')
     net_cfg = OmegaConf.load(resume_cfg_path)
-    cfg=OmegaConf.merge(net_cfg,cfg)
-    # DATA_DIR = os.path.join(current_dir, "data")
-    _, val_dataset, n_cam = get_cloud_datasets(
+    cfg = OmegaConf.merge(net_cfg,cfg)
+    if cfg.show:
+        writer = SummaryWriter(log_dir)
+    else:
+        writer = None
+
+    _, val_dataset = get_cloud_datasets(
         cfg=cfg
     )
-
-    # Initialize the Radiance Field model.
+    n_cam = cfg.data.n_cam
+    # Initialize VIP-CT model
     model = CTnet(cfg=cfg, n_cam=n_cam)
 
-    # Move the model to the relevant device.
-
-    # Resume training if requested.
+    # Load model
     assert os.path.isfile(checkpoint_resume_path)
     print(f"Resuming from checkpoint {checkpoint_resume_path}.")
     loaded_data = torch.load(checkpoint_resume_path, map_location=device)
     model.load_state_dict(loaded_data["model"])
     model.to(device)
-    # stats = pickle.loads(loaded_data["stats"])
-    # print(f"   => resuming from epoch {stats.epoch}.")
-    # optimizer_state_dict = loaded_data["optimizer"]
-    # start_epoch = stats.epoch
-    # Init stats to None before loading.
-    # stats = None
-    # optimizer_state_dict = None
-    # start_epoch = 0
-
-
-
-    # Initialize the optimizer.
-    # optimizer = torch.optim.Adam(
-    #     model.parameters(),
-    #     lr=cfg.optimizer.lr,
-    # )
-
-    # Load the optimizer state dict in case we are resuming.
-    # if optimizer_state_dict is not None:
-    #     optimizer.load_state_dict(optimizer_state_dict)
-    #     optimizer.last_epoch = start_epoch
-
-    # Init the stats object.
-    stats = Stats(["loss", "relative_error", "L2_error", "lr", "max_memory", "sec/it"])
-
 
     # The validation dataloader is just an endless stream of random samples.
     val_dataloader = torch.utils.data.DataLoader(
@@ -164,35 +92,25 @@ def main(cfg: DictConfig):
         batch_size=1,
         num_workers=4,
         collate_fn=trivial_collate,
-        # sampler=torch.utils.data.RandomSampler(
-        #     val_dataset,
-        #     replacement=True,
-        #     num_samples=cfg.optimizer.max_epochs,
-        # ),
     )
-    # err = torch.nn.MSELoss()
-    # err = torch.nn.L1Loss(reduction='sum')
-    # Set the model to the training mode.
-    model.eval().float()
-    model.eval()
 
-    # Run the main training loop.
+    # Set the model to eval mode.
+    model.eval().float()
+
     iteration = -1
     if writer:
+        # show scatter plot of 5 clouds
         val_scatter_ind = np.random.permutation(len(val_dataloader))[:5]
 
-    # Validation
-    # loss_val = 0
-    relative_err= []
+    relative_err = []
     l2_err = []
     relative_mass_err = []
     batch_time_net = []
     val_i = 0
+
+    # Run the main training loop.
     for val_i, val_batch in enumerate(val_dataloader):
-
-    # val_batch = next(val_dataloader.__iter__())
-
-        val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch  # [0]#.values()
+        val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch
         val_image = torch.tensor(val_image, device=device).float()
         val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
         val_camera = PerspectiveCameras(image_size=image_sizes, P=torch.tensor(projection_matrix, device=device).float(),
@@ -202,11 +120,12 @@ def main(cfg: DictConfig):
         else:
             masks = [torch.tensor(mask) if mask is not None else torch.ones(*extinction[0].shape,device=device, dtype=bool) for mask in masks]
 
-    # Activate eval mode of the model (lets us do a full rendering pass).
         with torch.no_grad():
             est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(
                 val_volume.extinctions.shape[0], -1)
             n_points_mask = torch.sum(torch.stack(masks)*1.0) if isinstance(masks, list) else masks.sum()
+
+            # don't make inference on empty/small clouds
             if n_points_mask > cfg.min_mask_points:
                 net_start_time = time.time()
 
@@ -225,32 +144,31 @@ def main(cfg: DictConfig):
                             est_vols[i][m] = out_vol.squeeze(1)
                 else:
                     for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
-                        est_vol[m]=out_vol.squeeze(1)#.reshape(m.shape)[m]
+                        est_vol[m]=out_vol.squeeze(1)
                 time_net = time.time() - net_start_time
             else:
                 time_net = 0
-            assert len(est_vols)==1 ##TODO support validation with batch larger than 1
+            assert len(est_vols)==1 ## TODO support inference with batch larger than 1
 
 
             gt_vol = val_volume.extinctions[0].squeeze()
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
-            # est_vols[gt_vol==0] = 0
             est_vols[est_vols<0] = 0
-            # loss_val += err(est_vols, gt_vol)
-            # loss_val += l1(val_out["output"], val_out["volume"]) / torch.sum(val_out["volume"]+1000)
+
             print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, L2 = {L2_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
-            # if relative_error(ext_est=est_vols,ext_gt=gt_vol)>2:
-            #     print()
-            if True:
-                import scipy.io as sio
+
+            if cfg.save_results:
                 val_image *= cfg.data.std
                 val_image += cfg.data.mean
                 sio.savemat(f'results_cloud_{val_i}.mat',{'gt':gt_vol.detach().cpu().numpy(),'est':est_vols.detach().cpu().numpy(), 'images': val_image.detach().cpu().numpy()})
-            relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
-            l2_err.append(L2_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#torch.norm(val_out["output"] - val_out["volume"], p=1) / (torch.norm(val_out["volume"], p=1) + 1e-6)
-            relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())#(torch.norm(val_out["output"], p=1) - torch.norm(val_out["volume"], p=1)) / (torch.norm(val_out["volume"], p=1) + 1e-6)
+
+            # aggregate error statistics
+            relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
+            l2_err.append(L2_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
+            relative_mass_err.append(mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             batch_time_net.append(time_net)
-            if False:
+
+            if cfg.show:
                 show_scatter_plot(gt_vol,est_vols)
                 show_scatter_plot_altitute(gt_vol,est_vols)
                 volume_plot(gt_vol,est_vols)
@@ -259,37 +177,27 @@ def main(cfg: DictConfig):
                 writer._dataset = 'val'  # .format(val_i)
                 if val_i in val_scatter_ind:
                     writer.monitor_scatter_plot(est_vols, gt_vol,ind=val_i)
-            # Update stats with the validation metrics.
 
 
-    # loss_val /= (val_i + 1)
     relative_err = np.array(relative_err)
-    l2_err = np.array(l2_err)
     relative_mass_err =np.array(relative_mass_err)
+    l2_err = np.array(l2_err)
     batch_time_net = np.array(batch_time_net)
     print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
+    print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
     print(f'mean L2 error {np.mean(l2_err)} with std of {np.std(l2_err)} for {(val_i + 1)} clouds')
+    print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')
+    sio.savemat(f'numerical_results.mat', {'relative_err': relative_err, 'relative_mass_err': relative_mass_err,
+                 'l2_err': l2_err, 'batch_time_net': batch_time_net})
+
     masked = relative_err<2
     relative_err1 = relative_err[masked]
-    l2_err1 = l2_err[masked]
-    print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
-    print(f'mean L2 error w/o outliers {np.mean(l2_err1)} with std of {np.std(l2_err1)} for {l2_err1.shape[0]} clouds')
-
-    print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
     relative_mass_err1 = relative_mass_err[masked]
+    l2_err1 = l2_err[masked]
+
+    print(f'mean relative error w/o outliers {np.mean(relative_err1)} with std of {np.std(relative_err1)} for {relative_err1.shape[0]} clouds')
     print(f'mean relative mass error w/o outliers {np.mean(relative_mass_err1)} with std of {np.std(relative_mass_err1)} for {relative_mass_err1.shape[0]} clouds')
-
-    print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')
-
-    np.save()
-    # print(batch_time_net)
-    if writer:
-        writer._iter = iteration
-        writer._dataset = 'val'#.format(val_i)
-        writer.monitor_loss(loss_val)
-        # writer.monitor_scatterer_error(relative_mass_err, relative_err)
-        # writer.monitor_images(val_image)
-
+    print(f'mean L2 error w/o outliers {np.mean(l2_err1)} with std of {np.std(l2_err1)} for {l2_err1.shape[0]} clouds')
 
 if __name__ == "__main__":
     main()

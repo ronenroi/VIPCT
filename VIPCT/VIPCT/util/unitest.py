@@ -1,6 +1,6 @@
 # This file contains the a script for VIP-CT feature sampling unitest.
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #

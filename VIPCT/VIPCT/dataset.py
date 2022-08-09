@@ -1,10 +1,10 @@
-# This file contains the code for cloud dataset loders for VIP-CT.
+# This file contains the code for synthetic cloud dataset loaders for VIP-CT.
 # It is based on PyTorch3D source code ('https://github.com/facebookresearch/pytorch3d') by FAIR
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -19,30 +19,17 @@
 
 
 import os, glob
-from typing import List, Optional, Tuple
+from typing import Tuple
 import pickle
-from .cameras import PerspectiveCameras
-from .volumes import Volumes
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 import socket
-# print(socket.gethostname())
 import random
 import scipy.io as sio
-# DEFAULT_DATA_ROOT = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/roi' \
-# if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256'
-
 
 DEFAULT_DATA_ROOT = '/home/roironen/Data' \
 if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data'
-
-
-    # os.path.join(
-    # os.path.dirname(os.path.realpath(__file__)), "../../..", "data/data"
-# )
-
-# DEFAULT_URL_ROOT = "https://dl.fbaipublicfiles.com/pytorch3d_nerf_data"
 
 ALL_DATASETS = ("BOMEX_10cams_polarization", "BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams",
                 "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2",
@@ -58,44 +45,21 @@ def trivial_collate(batch):
     return batch
 
 
-class ListDataset(Dataset):
-    """
-    A simple dataset made of a list of entries.
-    """
-
-    def __init__(self, entries: List) -> None:
-        """
-        Args:
-            entries: The list of dataset entries.
-        """
-        self._entries = entries
-
-    def __len__(
-        self,
-    ) -> int:
-        return len(self._entries)
-
-    def __getitem__(self, index):
-        return self._entries[index]
-
-
 def get_cloud_datasets(
     cfg,
     data_root: str = DEFAULT_DATA_ROOT,
-) -> Tuple[Dataset, Dataset, int]:
+) -> Tuple[Dataset, Dataset]:
     """
     Obtains the training and validation dataset object for a dataset specified
     with the `dataset_name` argument.
 
     Args:
-        dataset_name: The name of the dataset to load.
-        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
+        cfg: The config file with the name of the dataset to load.
         data_root: The root folder at which the data is stored.
 
     Returns:
         train_dataset: The training dataset object.
         val_dataset: The validation dataset object.
-        test_dataset: The testing dataset object.
     """
     dataset_name = cfg.data.dataset_name
 
@@ -161,28 +125,6 @@ def get_cloud_datasets(
         data_train_paths += [f for f in glob.glob(os.path.join(data_root_bomex, "train/cloud*.pkl"))]
         random.shuffle(data_train_paths)
     train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
-    # for cloud_path in data_train_paths:
-    #     try:
-    #         with open(cloud_path, 'rb') as f:
-    #             data = pickle.load(f)
-    #     except:
-    #         print(cloud_path)
-    # print('DONE')
-    # for file in data_train_paths:
-    #     with open(file, 'rb') as f:
-    #         data = pickle.load(f)
-    #     grid = data['grid']
-    #     grid[0] -= grid[0][0]
-    #     grid[1] -= grid[1][0]
-    #     grid[2] -= grid[2][0]
-    #     data['grid'] = grid.copy()
-    #     grid_net = grid
-    #     grid_net[0] += 0.025
-    #     grid_net[1] += 0.025
-    #     grid_net[2] += 0.02
-    #     data['net_grid'] = grid_net
-    #     with open(file, 'wb') as f:
-    #         pickle.dump(data, f)
     data_train_paths = data_train_paths[:train_len]
 
     n_cam = cfg.data.n_cam
@@ -209,36 +151,13 @@ def get_cloud_datasets(
         val_paths += [f for f in glob.glob(os.path.join(data_root_bomex, "test/cloud*.pkl"))]
         random.shuffle(val_paths)
 
-    # if dataset_name == 'CASS_10cams':
-    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    # elif dataset_name == 'BOMEX_10cams' or dataset_name == 'BOMEX_32cams' or dataset_name == 'BOMEX_10cams_varying' \
-    #         or 'BOMEX_10cams_50m':
-    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    # elif dataset_name == 'BOMEX_10cams_varyingV2':
-    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
-    # else:
-    #     val_paths = [f for f in glob.glob(os.path.join(data_root, "val/cloud*.pkl"))]
-    # for file in val_paths:
-    #     with open(file, 'rb') as f:
-    #         data = pickle.load(f)
-    #     grid = data['grid']
-    #     grid[0] -= grid[0][0]
-    #     grid[1] -= grid[1][0]
-    #     grid[2] -= grid[2][0]
-    #     data['grid'] = grid.copy()
-    #     grid_net = grid
-    #     grid_net[0] += 0.025
-    #     grid_net[1] += 0.025
-    #     grid_net[2] += 0.02
-    #     with open(file, 'wb') as f:
-    #         pickle.dump(data, f)
     val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
     val_paths = val_paths[:val_len]
     val_dataset = CloudDataset(val_paths, n_cam=n_cam,
         rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name
 )
 
-    return train_dataset, val_dataset, n_cam
+    return train_dataset, val_dataset
 
 
 class CloudDataset(Dataset):
@@ -304,565 +223,3 @@ class CloudDataset(Dataset):
         # if self.target_transform:
         #     label = self.target_transform(label)
         return images, extinction, grid, image_sizes, projection_matrix, camera_center, mask
-
-
-
-def get_cloud_microphysics_datasets(
-    cfg,
-    data_root: str = DEFAULT_DATA_ROOT,
-) -> Tuple[Dataset, Dataset, int]:
-    """
-    Obtains the training and validation dataset object for a dataset specified
-    with the `dataset_name` argument.
-
-    Args:
-        dataset_name: The name of the dataset to load.
-        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
-        data_root: The root folder at which the data is stored.
-
-    Returns:
-        train_dataset: The training dataset object.
-        val_dataset: The validation dataset object.
-        test_dataset: The testing dataset object.
-    """
-    dataset_name = cfg.data.dataset_name
-
-    if dataset_name not in ALL_DATASETS:
-        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
-
-    if dataset_name == 'BOMEX_10cams_polarization':
-        # data_root = '/wdata/yaelsc/Roi_ICCP22/CloudCT10sat_polarized_LWC_LOW_SC'
-        data_root = '/wdata/yaelsc/Roi_ICCP22/'
-        image_size = [123, 123]
-
-    if dataset_name == 'BOMEX_10cams_polarization':
-        print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-        data_train_paths = [f for f in glob.glob(os.path.join(data_root, "CloudCT10sat_polarized_LWC_NOISE/*.pkl"))]
-
-    train_len = cfg.data.n_training if cfg.data.n_training>0 else len(data_train_paths)
-
-    data_train_paths = data_train_paths[:train_len]
-
-    n_cam = cfg.data.n_cam
-    mean = cfg.data.mean
-    std = cfg.data.std
-    rand_cam = cfg.data.rand_cam
-    train_dataset = MicrophysicsCloudDataset(
-            data_train_paths,
-        n_cam=n_cam,
-        rand_cam = rand_cam,
-        mask_type=cfg.ct_net.mask_type,
-        mean=mean,
-        std=std,
-    dataset_name = dataset_name,
-
-    )
-    if dataset_name == 'BOMEX_10cams_polarization':
-        val_paths =  [f for f in glob.glob(os.path.join(data_root, "CloudCT10sat_polarized_LWC_NOISE_TEST/*.pkl"))]
-
-    val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
-    val_paths = val_paths[:val_len]
-    val_dataset = MicrophysicsCloudDataset(val_paths, n_cam=n_cam,
-        rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name
-)
-
-    return train_dataset, val_dataset, n_cam
-
-
-class MicrophysicsCloudDataset(Dataset):
-    def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name=''):
-        self.cloud_dir = cloud_dir
-        self.transform = transform
-        self.target_transform = target_transform
-        self.mask_type = mask_type
-        self.n_cam = n_cam
-        self.rand_cam = rand_cam
-        self.mean = mean
-        self.std = std
-        self.dataset_name = dataset_name
-
-    def __len__(self):
-        return len(self.cloud_dir)
-
-    def __getitem__(self, idx):
-        cloud_path = self.cloud_dir[idx]
-        if 'TEST' in cloud_path:
-            data_root = os.path.join(DEFAULT_DATA_ROOT, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras', 'test')
-        else:
-            data_root = os.path.join(DEFAULT_DATA_ROOT, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras', 'train')
-        image_index = cloud_path.split('satellites_images_')[-1].split('.pkl')[0]
-        projection_path = os.path.join(data_root, f"cloud_results_{image_index}.pkl")
-        with open(cloud_path, 'rb') as f:
-            data = pickle.load(f)
-        images = np.concatenate((data['images'], data['DoLPs'][:, None], data['AoLPs'][:, None]), 1)
-        mask = None
-        if self.mask_type == 'space_carving':
-            mask = data['mask']
-        elif self.mask_type == 'space_carving_morph':
-            mask = data['mask_morph']
-        if 'varying' in self.dataset_name:
-            index = torch.randperm(10)[0]
-            cam_i = torch.arange(index,100,10)
-            mask = mask[index] if mask is not None else None
-        else:
-            cam_i = torch.arange(self.n_cam)
-        images = images[cam_i]
-        images -= np.array(self.mean).reshape((1,5,1,1))
-        images /= np.array(self.std).reshape((1,5,1,1))
-
-        microphysics = np.array([data['lwc'],data['reff'],data['veff']])
-        microphysics = microphysics[:,1:-1,1:-1,:-1]
-        mask = mask[1:-1,1:-1,:-1]
-        # grid = data['net_grid']
-        if hasattr(data, 'image_sizes'):
-            image_sizes = data['image_sizes'][cam_i]
-        else:
-            image_sizes = [image.shape[1:] for image in images]
-        with open(projection_path, 'rb') as f:
-            data = pickle.load(f)
-
-        grid = data['grid']
-        camera_center = data['cameras_pos'][cam_i]
-        projection_matrix = data['cameras_P'][cam_i]
-
-
-
-        # train_ext.append(train_data['ext'])
-
-        # if self.transform:
-        #     image = self.transform(image)
-        # if self.target_transform:
-        #     label = self.target_transform(label)
-        return images, microphysics, grid, image_sizes, projection_matrix, camera_center, mask
-
-ALL_DATASETS_AIRMSPI = ("BOMEX_9cams", "BOMEX_9cams_varying")
-
-def get_airmspi_datasets(
-    cfg,
-    data_root: str = DEFAULT_DATA_ROOT,
-) -> Tuple[Dataset, Dataset, int]:
-    """
-    Obtains the training and validation dataset object for a dataset specified
-    with the `dataset_name` argument.
-
-    Args:
-        dataset_name: The name of the dataset to load.
-        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
-        data_root: The root folder at which the data is stored.
-
-    Returns:
-        train_dataset: The training dataset object.
-        val_dataset: The validation dataset object.
-        test_dataset: The testing dataset object.
-    """
-    dataset_name = cfg.data.dataset_name
-
-    if dataset_name not in ALL_DATASETS_AIRMSPI:
-        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
-
-    if dataset_name == 'BOMEX_9cams':
-        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-        image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC_NOISY_PROJ/'
-        mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
-        with open(mapping_path, 'rb') as f:
-            mapping = pickle.load(f)
-        image_size = [350, 350]
-    elif dataset_name == 'BOMEX_9cams_varying':
-        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-        image_root = '/wdata/roironen/Data/AirMSPINEW/'
-        mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
-        with open(mapping_path, 'rb') as f:
-            mapping = pickle.load(f)
-        image_size = [350, 350]
-    else:
-        NotImplementedError()
-    images_mapping_list = []
-    for _, map in mapping.items():
-        voxels_list = []
-        v = map.values()
-        voxels = np.array(list(v),dtype=object)
-        ctr = 0
-        for i, voxel in enumerate(voxels):
-            if len(voxel)>0:
-                pixels = np.unravel_index(voxel, np.array(image_size))
-                mean_px = np.mean(pixels,1)
-                voxels_list.append(mean_px)
-            else:
-                ctr +=1
-                voxels_list.append([-100000,-100000])
-        images_mapping_list.append(voxels_list)
-
-    #pixel_centers = sio.loadmat('/wdata/roironen/Data/pixel_centers.mat')['xpc']
-    print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-    image_train_paths = [f for f in glob.glob(os.path.join(image_root, "*.pkl"))]
-    cloud_train_path = data_root
-    train_len = cfg.data.n_training if cfg.data.n_training>0 else len(image_train_paths)
-
-    image_train_paths = image_train_paths[:train_len]
-    # cloud_train_paths = cloud_train_paths[:train_len]
-    n_cam = cfg.data.n_cam
-    mean = cfg.data.mean
-    std = cfg.data.std
-    # rand_cam = cfg.data.rand_cam
-    train_dataset = AirMSPIDataset(
-            cloud_train_path,
-        image_train_paths,
-        mapping=images_mapping_list,
-        n_cam=n_cam,
-        mask_type=cfg.ct_net.mask_type,
-        mean=mean,
-        std=std,
-    dataset_name = dataset_name,
-        drop_index = cfg.data.drop_index,
-        #pixel_centers=pixel_centers
-    )
-
-
-
-    return train_dataset, train_dataset,  n_cam
-
-
-class AirMSPIDataset(Dataset):
-    def __init__(self, cloud_dir,image_dir, n_cam,mapping, mask_type=None, mean=0, std=1, dataset_name='', drop_index=-1):
-        self.cloud_dir = cloud_dir
-        self.mapping = mapping
-        self.image_dir = image_dir
-        self.mask_type = mask_type
-        self.n_cam = n_cam
-        self.mean = mean
-        self.std = std
-        self.dataset_name = dataset_name
-        self.drop_index = drop_index
-        if self.n_cam != 9 and self.drop_index>-1:
-            self.mapping.pop(drop_index)
-            #self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,0)
-
-    def __len__(self):
-        return len(self.cloud_dir)
-
-    def __getitem__(self, idx):
-        image_dir = self.image_dir[idx]
-        image_index = image_dir.split('satellites_images_')[-1].split('.pkl')[0]
-        cloud_path = os.path.join(self.cloud_dir, f"cloud_results_{image_index}.pkl")
-
-
-        with open(cloud_path, 'rb') as f:
-            data = pickle.load(f)
-        with open(image_dir, 'rb') as f:
-            images = pickle.load(f)['images']
-        if self.n_cam!=9:
-            images = np.delete(images,self.drop_index,0)
-        mask = None
-        if self.mask_type == 'space_carving':
-            mask = data['mask']
-        elif self.mask_type == 'space_carving_morph':
-            mask = data['mask_morph']
-        images -= self.mean
-        images /= self.std
-        grid = data['grid']
-        # grid = data['net_grid']
-        # if hasattr(data, 'image_sizes'):
-        #     image_sizes = data['image_sizes']
-        # else:
-        #     image_sizes = [image.shape for image in images]
-        extinction = data['ext'] / 10
-
-        images_mapping_list = [ np.array(map)[mask.ravel()] for map in self.mapping]
-
-        return images, extinction, grid, images_mapping_list, mask
-
-
-
-def get_airmspi_datasetsV2(
-    cfg,
-    data_root: str = DEFAULT_DATA_ROOT,
-) -> Tuple[Dataset, Dataset, int]:
-    """
-    Obtains the training and validation dataset object for a dataset specified
-    with the `dataset_name` argument.
-
-    Args:
-        dataset_name: The name of the dataset to load.
-        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
-        data_root: The root folder at which the data is stored.
-
-    Returns:
-        train_dataset: The training dataset object.
-        val_dataset: The validation dataset object.
-        test_dataset: The testing dataset object.
-    """
-    dataset_name = cfg.data.dataset_name
-
-    if dataset_name not in ALL_DATASETS_AIRMSPI:
-        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
-
-    if dataset_name == 'BOMEX_9cams':
-        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-        image_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/AirMSPI/LOW_SC/AIRMSPI_IMAGES_LWC_LOW_SC'
-        mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
-        with open(mapping_path, 'rb') as f:
-            mapping = pickle.load(f)
-        image_size = [350, 350]
-    else:
-        NotImplementedError()
-    images_mapping_list = []
-    pixel_centers_list = []
-    pixel_centers = sio.loadmat('/wdata/roironen/Data/pixel_centers.mat')['xpc']
-    camera_ind = 0
-    for _, map in mapping.items():
-        voxels_list = []
-        pixel_list = []
-        v = map.values()
-        voxels = np.array(list(v),dtype=object)
-        for i, voxel in enumerate(voxels):
-            if len(voxel)>0:
-                pixels = np.unravel_index(voxel, np.array(image_size))
-                mean_px = np.mean(pixels,1)
-                voxels_list.append(mean_px)
-                pixel_list.append(pixel_centers[camera_ind,:,int(mean_px[0]),int(mean_px[1])])
-            else:
-                voxels_list.append([-100000,-100000])
-                pixel_list.append([-10000, -10000, -10000])
-
-        camera_ind += 1
-        images_mapping_list.append(voxels_list)
-        pixel_centers_list.append(pixel_list)
-
-    print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-    image_train_paths = [f for f in glob.glob(os.path.join(image_root, "*.pkl"))]
-    cloud_train_path = data_root
-    train_len = cfg.data.n_training if cfg.data.n_training>0 else len(image_train_paths)
-
-    image_train_paths = image_train_paths[:train_len]
-    # cloud_train_paths = cloud_train_paths[:train_len]
-    n_cam = cfg.data.n_cam
-    mean = cfg.data.mean
-    std = cfg.data.std
-    # rand_cam = cfg.data.rand_cam
-    train_dataset = AirMSPIDatasetV2(
-            cloud_train_path,
-        image_train_paths,
-        mapping=images_mapping_list,
-        n_cam=n_cam,
-        mask_type=cfg.ct_net.mask_type,
-        mean=mean,
-        std=std,
-    dataset_name = dataset_name,
-        drop_index = cfg.data.drop_index,
-        pixel_centers=pixel_centers_list
-    )
-
-
-
-    return train_dataset, train_dataset,  n_cam
-
-
-class AirMSPIDatasetV2(Dataset):
-    def __init__(self, cloud_dir,image_dir, n_cam,mapping, pixel_centers, mask_type=None, mean=0, std=1, dataset_name='', drop_index=-1):
-        self.cloud_dir = cloud_dir
-        self.mapping = mapping
-        self.image_dir = image_dir
-        self.mask_type = mask_type
-        self.n_cam = n_cam
-        self.mean = mean
-        self.std = std
-        self.dataset_name = dataset_name
-        self.pixel_centers = pixel_centers
-        self.drop_index = drop_index
-        if self.n_cam != 9 and self.drop_index>-1:
-            self.mapping.pop(drop_index)
-            self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,0)
-
-    def __len__(self):
-        return len(self.cloud_dir)
-
-    def __getitem__(self, idx):
-        image_dir = self.image_dir[idx]
-        image_index = image_dir.split('satellites_images_')[-1].split('.pkl')[0]
-        cloud_path = os.path.join(self.cloud_dir, f"cloud_results_{image_index}.pkl")
-
-
-        with open(cloud_path, 'rb') as f:
-            data = pickle.load(f)
-        with open(image_dir, 'rb') as f:
-            images = pickle.load(f)['images']
-        if self.n_cam!=9:
-            images = np.delete(images,self.drop_index,0)
-        mask = None
-        if self.mask_type == 'space_carving':
-            mask = data['mask']
-        elif self.mask_type == 'space_carving_morph':
-            mask = data['mask_morph']
-        images -= self.mean
-        images /= self.std
-        grid = data['grid']
-        # grid = data['net_grid']
-        # if hasattr(data, 'image_sizes'):
-        #     image_sizes = data['image_sizes']
-        # else:
-        #     image_sizes = [image.shape for image in images]
-        extinction = data['ext'] / 10
-
-        images_mapping_list = [ np.array(map)[mask.ravel()] for map in self.mapping]
-        pixel_centers = [ np.array(centers)[mask.ravel()] for centers in self.pixel_centers]
-
-
-        return images, extinction, grid, images_mapping_list, pixel_centers, mask
-
-
-
-
-def get_airmspi_datasetsV2_varying(
-    cfg,
-    data_root: str = DEFAULT_DATA_ROOT,
-) -> Tuple[Dataset, Dataset, int]:
-    """
-    Obtains the training and validation dataset object for a dataset specified
-    with the `dataset_name` argument.
-
-    Args:
-        dataset_name: The name of the dataset to load.
-        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
-        data_root: The root folder at which the data is stored.
-
-    Returns:
-        train_dataset: The training dataset object.
-        val_dataset: The validation dataset object.
-        test_dataset: The testing dataset object.
-    """
-    dataset_name = cfg.data.dataset_name
-
-    if dataset_name not in ALL_DATASETS_AIRMSPI:
-        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
-
-    if dataset_name == 'BOMEX_9cams':
-        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-        image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/'
-        # mapping_paths = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebat_voxel_pixel_list32x32x32_BOMEX_img350x350_20160826_104727Z_SouthAtlanticOcean-14S19W.pkl'
-        mapping_paths = [f for f in glob.glob('/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebat_voxel_pixel_list32x32x32_BOMEX_img350x350*.pkl')]
-        pixel_center_paths = [f for f in glob.glob('/wdata/roironen/Data/AirMSPI-Varying/training/*.mat')]
-        image_size = [350, 350]
-    else:
-        NotImplementedError()
-    # images_mapping_lists = []
-    # pixel_centers_lists = []
-    # for mapping_path, pixel_center_path in zip(mapping_paths, pixel_center_paths):
-    #     with open(mapping_path, 'rb') as f:
-    #         mapping = pickle.load(f)
-    #     images_mapping_list = []
-    #     pixel_centers_list = []
-    #     pixel_centers = sio.loadmat(pixel_center_path)['xpc']
-    #     camera_ind = 0
-    #     for _, map in mapping.items():
-    #         voxels_list = []
-    #         pixel_list = []
-    #         v = map.values()
-    #         voxels = np.array(list(v),dtype=object)
-    #         for i, voxel in enumerate(voxels):
-    #             if len(voxel)>0:
-    #                 pixels = np.unravel_index(voxel, np.array(image_size))
-    #                 mean_px = np.mean(pixels,1)
-    #                 voxels_list.append(mean_px)
-    #                 pixel_list.append(pixel_centers[camera_ind,:,int(mean_px[0]),int(mean_px[1])])
-    #             else:
-    #                 voxels_list.append([-100000,-100000])
-    #                 pixel_list.append([-10000, -10000, -10000])
-    #
-    #         camera_ind += 1
-    #         images_mapping_list.append(voxels_list)
-    #         pixel_centers_list.append(pixel_list)
-    #     images_mapping_lists.append((images_mapping_list))
-    #     pixel_centers_lists.append(pixel_centers_list)
-    # print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-    # with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl', 'wb') as f:
-    #     pickle.dump(images_mapping_lists, f, pickle.HIGHEST_PROTOCOL)
-    # with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl', 'wb') as f:
-    #     pickle.dump(pixel_centers_lists, f, pickle.HIGHEST_PROTOCOL)
-    with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl', 'rb') as f:
-        images_mapping_lists = pickle.load(f)
-    with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl', 'rb') as f:
-        pixel_centers_lists = pickle.load(f)
-    image_train_paths = [f for f in glob.glob(os.path.join(image_root, "SIMULATED_AIRMSPI_TRAIN*"))]
-    image_train_paths = [glob.glob(os.path.join(f, "*.pkl")) for f in image_train_paths]
-
-    cloud_train_path = data_root
-    assert cfg.data.n_training<=0
-    # train_len = cfg.data.n_training if cfg.data.n_training>0 else len(image_train_paths)
-
-    # image_train_paths = image_train_paths[:train_len]
-    # cloud_train_paths = cloud_train_paths[:train_len]
-    n_cam = cfg.data.n_cam
-    mean = cfg.data.mean
-    std = cfg.data.std
-    # rand_cam = cfg.data.rand_cam
-    train_dataset = AirMSPIDatasetV2_varying(
-            cloud_train_path,
-        image_train_paths,
-        mapping=images_mapping_lists,
-        n_cam=n_cam,
-        mask_type=cfg.ct_net.mask_type,
-        mean=mean,
-        std=std,
-    dataset_name = dataset_name,
-        drop_index = cfg.data.drop_index,
-        pixel_centers=pixel_centers_lists
-    )
-
-
-
-    return train_dataset, train_dataset,  n_cam
-
-
-class AirMSPIDatasetV2_varying(Dataset):
-    def __init__(self, cloud_dir,image_dir, n_cam,mapping, pixel_centers, mask_type=None, mean=0, std=1, dataset_name='', drop_index=-1):
-        self.cloud_dir = cloud_dir
-        self.mapping = mapping
-        self.image_dir = image_dir
-        self.mask_type = mask_type
-        self.n_cam = n_cam
-        self.mean = mean
-        self.std = std
-        self.dataset_name = dataset_name
-        self.pixel_centers = pixel_centers
-        self.drop_index = drop_index
-        if self.n_cam != 9 and self.drop_index>-1:
-            for map in self.mapping:
-                map.pop(drop_index)
-            self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,1)
-
-    def __len__(self):
-        return len(self.cloud_dir)
-
-    def __getitem__(self, idx):
-        geometry_ind = np.random.randint(len(self.image_dir))
-        image_dir = self.image_dir[geometry_ind][idx]
-        image_index = image_dir.split('satellites_images_')[-1].split('.pkl')[0]
-        cloud_path = os.path.join(self.cloud_dir, f"cloud_results_{image_index}.pkl")
-
-
-        with open(cloud_path, 'rb') as f:
-            data = pickle.load(f)
-        with open(image_dir, 'rb') as f:
-            images = pickle.load(f)['images']
-        if self.n_cam!=9:
-            images = np.delete(images,self.drop_index,0)
-        mask = None
-        if self.mask_type == 'space_carving':
-            mask = data['mask']
-        elif self.mask_type == 'space_carving_morph':
-            mask = data['mask_morph']
-        images -= self.mean
-        images /= self.std
-        grid = data['grid']
-        # grid = data['net_grid']
-        # if hasattr(data, 'image_sizes'):
-        #     image_sizes = data['image_sizes']
-        # else:
-        #     image_sizes = [image.shape for image in images]
-        extinction = data['ext'] / 10
-
-        images_mapping_list = [ np.array(map)[mask.ravel()] for map in self.mapping[geometry_ind]]
-        pixel_centers = [ np.array(centers)[mask.ravel()] for centers in self.pixel_centers[geometry_ind]]
-
-
-        return images, extinction, grid, images_mapping_list, pixel_centers, mask

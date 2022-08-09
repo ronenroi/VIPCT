@@ -1,6 +1,6 @@
 # This file contains the main VIP-CT framework code.
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -22,10 +22,7 @@ from .cameras import PerspectiveCameras, AirMSPICameras
 from .mlp_function import MLPWithInputSkips, MLPIdentity
 from .encoder import Backbone
 from .decoder import Decoder
-from .feature_encoding import FeatureEncoding
-from .positinal_encoding import PositionalEncoding
-from .self_attention import SelfAttention
-from .mask import MaskGenerator
+
 
 
 
@@ -116,11 +113,7 @@ class CTnet(torch.nn.Module):
             self.mlp_xyz = None
             self.mlp_cam_center = None
         self.decoder_input_size *= n_cam
-        if feature_encoding:
-            self._feature_encoder = FeatureEncoding(n_harmonic_functions=cfg.feature_encoder.n_harm)
-            self.decoder_input_size *= (1 + 2 * cfg.feature_encoder.n_harm)
-        else:
-            self._feature_encoder = None
+
 
         self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.use_neighbours)
 
@@ -225,8 +218,7 @@ class CTnet(torch.nn.Module):
                 latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
                 del embed_camera_center
 
-            if self._feature_encoder:
-                latent = self._feature_encoder(latent)
+
 
             output = self.decoder(latent)#.reshape(Vbatch, n_query)
 
@@ -260,8 +252,7 @@ class CTnet(torch.nn.Module):
                     embed_camera_center_chunk = embed_camera_center_chunk.reshape(-1, *embed_camera_center_chunk.shape[2:])
                     latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
-                if self._feature_encoder:
-                    latent_chunk = self._feature_encoder(latent_chunk)
+
                 output_chunk = self.decoder(latent_chunk)
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
@@ -360,11 +351,7 @@ class CTnetMicrophysics(torch.nn.Module):
             self.mlp_xyz = None
             self.mlp_cam_center = None
         self.decoder_input_size *= n_cam
-        if feature_encoding:
-            self._feature_encoder = FeatureEncoding(n_harmonic_functions=cfg.feature_encoder.n_harm)
-            self.decoder_input_size *= (1 + 2 * cfg.feature_encoder.n_harm)
-        else:
-            self._feature_encoder = None
+
 
         self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.use_neighbours)
 
@@ -466,8 +453,7 @@ class CTnetMicrophysics(torch.nn.Module):
                 latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
                 del embed_camera_center
 
-            if self._feature_encoder:
-                latent = self._feature_encoder(latent)
+
 
             output = self.decoder(latent)#.reshape(Vbatch, n_query)
 
@@ -496,8 +482,7 @@ class CTnetMicrophysics(torch.nn.Module):
                     embed_camera_center_chunk = embed_camera_center_chunk.reshape(-1, *embed_camera_center_chunk.shape[2:])
                     latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
-                if self._feature_encoder:
-                    latent_chunk = self._feature_encoder(latent_chunk)
+
                 output_chunk = self.decoder(latent_chunk)
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
@@ -595,11 +580,7 @@ class CTnetAirMSPI(torch.nn.Module):
             self.mlp_xyz = None
             # self.mlp_cam_center = None
         self.decoder_input_size *= n_cam
-        if feature_encoding:
-            self._feature_encoder = FeatureEncoding(n_harmonic_functions=cfg.feature_encoder.n_harm)
-            self.decoder_input_size *= (1 + 2 * cfg.feature_encoder.n_harm)
-        else:
-            self._feature_encoder = None
+
 
         self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.use_neighbours)
 
@@ -700,8 +681,7 @@ class CTnetAirMSPI(torch.nn.Module):
                 latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
                 del embed_camera_center
 
-            if self._feature_encoder:
-                latent = self._feature_encoder(latent)
+
 
             output = self.decoder(latent)#.reshape(Vbatch, n_query)
 
@@ -730,8 +710,7 @@ class CTnetAirMSPI(torch.nn.Module):
                     embed_camera_center_chunk = embed_camera_center_chunk.reshape(-1, *embed_camera_center_chunk.shape[2:])
                     latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
-                if self._feature_encoder:
-                    latent_chunk = self._feature_encoder(latent_chunk)
+
                 output_chunk = self.decoder(latent_chunk)
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
@@ -821,11 +800,7 @@ class CTnetAirMSPIv2(torch.nn.Module):
             self.mlp_xyz = None
             # self.mlp_cam_center = None
         self.decoder_input_size *= n_cam
-        if feature_encoding:
-            self._feature_encoder = FeatureEncoding(n_harmonic_functions=cfg.feature_encoder.n_harm)
-            self.decoder_input_size *= (1 + 2 * cfg.feature_encoder.n_harm)
-        else:
-            self._feature_encoder = None
+
 
         self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.use_neighbours)
 
@@ -926,8 +901,7 @@ class CTnetAirMSPIv2(torch.nn.Module):
                 latent = torch.vstack([torch.cat([lat, embed.transpose(0, 1)], -1) for lat, embed in zip(latent, embed_camera_center)])
                 del embed_camera_center
 
-            if self._feature_encoder:
-                latent = self._feature_encoder(latent)
+
 
             output = self.decoder(latent)#.reshape(Vbatch, n_query)
 
@@ -960,8 +934,6 @@ class CTnetAirMSPIv2(torch.nn.Module):
                     embed_camera_center_chunk = embed_camera_center_chunk.transpose(0, 1)
                     latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
-                if self._feature_encoder:
-                    latent_chunk = self._feature_encoder(latent_chunk)
                 output_chunk = self.decoder(latent_chunk)
                 output_chunk = torch.split(output_chunk, n_split)
                 output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]

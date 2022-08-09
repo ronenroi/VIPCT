@@ -5,7 +5,7 @@
 # All rights reserved.
 
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -466,73 +466,3 @@ class SummaryWriter(object):
     def tf_writer(self):
         return self._tf_writer
 
-# def visualize_ct_outputs(
-#     out: dict, output_cache: List, viz: Visdom, visdom_env: str
-# ):
-#     """
-#     Visualizes the outputs of the `RadianceFieldRenderer`.
-#
-#     Args:
-#         out: An output of the validation rendering pass.
-#         output_cache: A list with outputs of several training render passes.
-#         viz: A visdom connection object.
-#         visdom_env: The name of visdom environment for visualization.
-#     """
-#
-#     # Show the training images.
-#     ims = torch.stack([o["image"] for o in output_cache])[:,0,...]
-#     # ims = torch.cat(list(ims), dim=0)
-#     viz.images(
-#         ims.clamp(0., 1.),#.permute(2, 0, 1),
-#         env=visdom_env,
-#         win="images",
-#         opts={"title": "train_images"},
-#     )
-#
-#     # # Show the coarse and fine renders together with the ground truth images.
-#     # ims_full = torch.cat(
-#     #     [
-#     #         nerf_out[imvar][0].permute(2, 0, 1).detach().cpu().clamp(0.0, 1.0)
-#     #         for imvar in ("rgb_coarse", "rgb_fine", "rgb_gt")
-#     #     ],
-#     #     dim=2,
-#     # )
-#     # viz.image(
-#     #     ims_full,
-#     #     env=visdom_env,
-#     #     win="images_full",
-#     #     opts={"title": "coarse | fine | target"},
-#     # )
-#
-#     # Make a 3D plot of training cameras and their emitted rays.
-#     # camera_trace = {
-#     #     f"camera_{ci:03d}": o.cpu() for ci, o in enumerate(output_cache[0]["camera"])
-#     # }
-#     # ray_pts_trace = {
-#     #     f"ray_pts_{ci:03d}": Pointclouds(
-#     #         ray_bundle_to_ray_points(o["coarse_ray_bundle"])
-#     #         .detach()
-#     #         .cpu()
-#     #         .view(1, -1, 3)validation_epoch_interval
-#     #     )
-#     #     for ci, o in enumerate(output_cache)
-#     # }
-#     # plotly_plot = plot_scene(
-#     #     {
-#     #         "training_scene": {
-#     #             **camera_trace,
-#     #             # **ray_pts_trace,
-#     #         },
-#     #     },
-#     #     pointcloud_max_points=5000,
-#     #     pointcloud_marker_size=1,
-#     #     camera_scale=0.3,
-#     # )
-#     # viz.plotlyplot(plotly_plot, env=visdom_env, win="scenes")
-#
-#     # scatter plots
-#     viz.scatter(
-#         X=torch.cat((out['volume'],out['output']),1),
-#         env=visdom_env, win="scatter",
-#         opts={"title": "Training scatter"}
-#     )

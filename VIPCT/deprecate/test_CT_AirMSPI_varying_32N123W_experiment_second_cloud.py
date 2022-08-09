@@ -1,6 +1,6 @@
 # This file contains the main script for VIP-CT evaluation on AirMSPI data.
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -177,26 +177,24 @@ def main(cfg: DictConfig):
     relative_err= []
     relative_mass_err = []
     batch_time_net = []
-    val_image = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/croped_airmspi_9images_for_Roi.mat')['croped_airmspi_images']
+    val_image = sio.loadmat('/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/32N123W_experiment/croped_airmspi_9images_for_Roi.mat')['croped_airmspi_images'] # 32N123W_experiment
+
     if cfg.data.n_cam != 9:
         val_image = np.delete(val_image, cfg.data.drop_index, 0)
     val_image = torch.tensor(val_image,device=device).float()[None]
 
-    # masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']
-    masks = sio.loadmat('/wdata/roironen/Data/mask_72x72x32_vox50x50x40mROI.mat')['mask']
-    # mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
-    # mapping_path = '/wdata/yaelsc/AirMSPI_raw_data/raw_data/voxel_pixel_list72x72x32_BOMEX_img350x350.pkl'
-    # mapping_path = '/wdata/roironen/Data/voxel_pixel_list72x72x32_BOMEX_img350x350_processed.pkl'
+    masks = sio.loadmat('/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/32N123W_experiment/mask_60x60x32_vox50x50x40m.mat')['mask'] # 32N123W_experiment
+
+
+    # mapping_path = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/32N123W_experiment/voxel_pixel_list60x60x32_BOMEX_img350x350.pkl' # 32N123W_experiment
     # with open(mapping_path, 'rb') as f:
     #     mapping = pickle.load(f)
-    # images_mapping_list = sio.loadmat(mapping_path)['map']
-    # pixel_center_path = '/wdata/roironen/Data/AirMSPI-Varying/test/20130206_202754Z_NorthPacificOcean-32N123W_vadim_measurement.mat'
+    # # images_mapping_list = sio.loadmat(mapping_path)['map']
+    # pixel_center_path = '/wdata/roironen/Data/32N132W_second_cloud_shdom_measurements_pixels_center.mat'
+    # pixel_centers = sio.loadmat(pixel_center_path)['xpc']
     # image_size = [350, 350]
-    # with open(mapping_path, 'rb') as f:
-    #     mapping = pickle.load(f)
     # images_mapping_list = []
     # pixel_centers_list = []
-    # pixel_centers = sio.loadmat(pixel_center_path)['xpc']
     # camera_ind = 0
     # for _, map in mapping.items():
     #     voxels_list = []
@@ -217,14 +215,14 @@ def main(cfg: DictConfig):
     #     images_mapping_list.append(voxels_list)
     #     pixel_centers_list.append(pixel_list)
     #
-    # with open('/wdata/roironen/Data/AirMSPI-Varying/test/rebat_images_mapping_lists72x72x32_BOMEX_img350x350.pkl', 'wb') as f:
+    # with open('/wdata/roironen/Data/AirMSPI-Varying/test/32N123W_rebat_images_mapping_lists60x60x32_18S8E_img350x350.pkl', 'wb') as f:
     #     pickle.dump(images_mapping_list, f, pickle.HIGHEST_PROTOCOL)
-    # with open('/wdata/roironen/Data/AirMSPI-Varying/test/rebat_pixel_centers_lists72x72x32_BOMEX_img350x350.pkl', 'wb') as f:
+    # with open('/wdata/roironen/Data/AirMSPI-Varying/test/32N123W_rebat_pixel_centers_lists60x60x32_18S8E_img350x350.pkl', 'wb') as f:
     #     pickle.dump(pixel_centers_list, f, pickle.HIGHEST_PROTOCOL)
 
-    with open('/wdata/roironen/Data/AirMSPI-Varying/test/rebat_images_mapping_lists72x72x32_BOMEX_img350x350.pkl', 'rb') as f:
+    with open('/wdata/roironen/Data/AirMSPI-Varying/test/32N123W_rebat_images_mapping_lists60x60x32_18S8E_img350x350.pkl', 'rb') as f:
         images_mapping_list = pickle.load(f)
-    with open('/wdata/roironen/Data/AirMSPI-Varying/test/rebat_pixel_centers_lists72x72x32_BOMEX_img350x350.pkl', 'rb') as f:
+    with open('/wdata/roironen/Data/AirMSPI-Varying/test/32N123W_rebat_pixel_centers_lists60x60x32_18S8E_img350x350.pkl', 'rb') as f:
         pixel_centers_list = pickle.load(f)
 
     if cfg.data.n_cam != 9:
@@ -244,8 +242,8 @@ def main(cfg: DictConfig):
     masks = torch.tensor(masks,device=device)[None]
     # gx = np.linspace(-20*0.05,0.05 * 52,72, dtype=np.float32)
     # gy = np.linspace(-20*0.05, 0.05 * 52, 72, dtype=np.float32)
-    gx = np.linspace(0,0.05 * 72,72, dtype=np.float32)
-    gy = np.linspace(0, 0.05 * 72, 72, dtype=np.float32)
+    gx = np.linspace(0,0.05 * 60,60, dtype=np.float32)
+    gy = np.linspace(0, 0.05 * 60, 60, dtype=np.float32)
     gz = np.linspace(0, 0.04 * 32, 32, dtype=np.float32)
     grid = [np.array([gx,gy,gz])]
     val_volume = Volumes(torch.unsqueeze(torch.tensor(masks, device=device).float(), 1), grid)

@@ -1,6 +1,6 @@
-# This file contains an old script for VIP-CT training on AirMSPI data.
+# This file contains the main script for VIP-CT training on AirMSPI data.
 # You are very welcome to use this code. For this, clearly acknowledge
-# the source of this code, and cite the paper that describes the readme file:
+# the source of this code, and cite the paper described in the readme file:
 # Roi Ronen, Vadim Holodovsky and Yoav. Y. Schechner, "Variable Imaging Projection Cloud Scattering Tomography",
 # Proc. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2022.
 #
@@ -17,37 +17,33 @@ import collections
 import os, time
 import pickle
 import warnings
-# import sys
-# sys.path.insert(0, '/home/roironen/pyshdom-NN/projects')
 import hydra
 import numpy as np
 import torch
 from VIPCT.visualization import SummaryWriter
-from VIPCT.dataset import get_airmspi_datasets, trivial_collate
+from VIPCT.airmspi_dataset import get_airmspi_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
-from VIPCT.cameras import AirMSPICameras
-# from ignite.handlers.param_scheduler import create_lr_scheduler_with_warmup
+from VIPCT.cameras import AirMSPICameras, AirMSPICamerasV2
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
 
-@hydra.main(config_path=CONFIG_DIR, config_name="basic_training_AirMSPI")
+@hydra.main(config_path=CONFIG_DIR, config_name="basic_training_AirMSPI_varying")
 def main(cfg: DictConfig):
 
     # Set the relevant seeds for reproducibility.
     np.random.seed(cfg.seed)
     torch.manual_seed(cfg.seed)
 
-
     # Device on which to run.
     if torch.cuda.is_available() and cfg.debug == False:
         n_device = torch.cuda.device_count()
-        cfg.gpu = 0 if n_device==1 else cfg.gpu
+        cfg.gpu = 0 if n_device == 1 else cfg.gpu
         device = f"cuda:{cfg.gpu}"
     else:
         warnings.warn(
@@ -56,15 +52,11 @@ def main(cfg: DictConfig):
         )
         device = "cpu"
 
-    # Load the training/validation data.
-    current_dir = os.path.dirname(os.path.realpath(__file__))
     # DATA_DIR = os.path.join(current_dir, "data")
-    train_dataset, val_dataset, n_cam = get_airmspi_datasets(
-        cfg=cfg
-    )
+    train_dataset, val_dataset = get_airmspi_datasets(cfg=cfg)
 
     # Initialize the CT model.
-    model = CTnetAirMSPI(cfg=cfg, n_cam=n_cam)
+    model = CTnetAirMSPIv2(cfg=cfg, n_cam=cfg.data.ncam)
 
     # Move the model to the relevant device.
     model.to(device)
@@ -190,8 +182,8 @@ def main(cfg: DictConfig):
 
             images = torch.tensor(images, device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
-            cameras = AirMSPICameras(mapping=torch.tensor(mapping, device=device).float(),
-                                     centers=centers,
+            cameras = AirMSPICamerasV2(mapping=torch.tensor(mapping).float(),
+                                     centers=torch.tensor(centers).float(),
                                          device=device)
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
             if model.mask_type == 'gt_mask':

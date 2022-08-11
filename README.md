@@ -1,5 +1,5 @@
 # VIP-CT: Variable Imaging Projection Cloud Scattering Tomography
-[![arXiv](https://img.shields.io/static/v1?label=ICCP2022|TPAMI&message=VIP-CT&color=blueviolet)](https://ieeexplore.ieee.org/abstract/document/9847357)
+[![arXiv](https://img.shields.io/static/v1?label=TPAMI|ICCP2022&message=VIP-CT&color=blueviolet)](https://ieeexplore.ieee.org/abstract/document/9847357)
 
 ## Abstract
 Scattering-based computed tomography (CT) recovers a heterogeneous volumetric scattering medium using images taken

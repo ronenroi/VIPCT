@@ -18,15 +18,13 @@
 # LICENSE file in the root directory of this source tree.
 
 
-import math
-import warnings
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from .util.types import Device
-from .util.renderer_utils import TensorProperties, convert_to_tensors_and_broadcast
+from .util.renderer_utils import TensorProperties
 
 
 # Default values for rotation and translation matrices.
@@ -309,148 +307,7 @@ class PerspectiveCameras(TensorProperties):
     #     return unprojection_transform.transform_points(xy_inv_depth)
 
 
-
-
 class AirMSPICameras(TensorProperties):
-    """
-    A class which stores a batch of parameters to generate a batch of
-    transformation matrices using the multi-view geometry convention for
-    perspective camera.
-
-    Parameters for this camera are specified in NDC if `in_ndc` is set to True.
-    If parameters are specified in screen space, `in_ndc` must be set to False.
-    """
-
-    def __init__(
-            self,
-            mapping: torch.tensor,
-            centers: torch.tensor=None,
-            device: Device = "cpu"
-    ):
-
-        super().__init__(
-            device=device,
-            mapping=mapping,
-            centers=centers,
-        )
-
-        # if (self.image_size < 1).any():  # pyre-ignore
-        #     raise ValueError("Image_size provided has invalid values")
-
-
-    # def get_camera_center(self) -> torch.Tensor:
-    #     """
-    #     Return the 3D location of the camera optical center
-    #     in the world coordinates.
-    #
-    #     Args:
-    #         **kwargs: parameters for the camera extrinsics can be passed in
-    #             as keyword arguments to override the default values
-    #             set in __init__.
-    #
-    #     Setting T here will update the values set in init as this
-    #     value may be needed later on in the rendering pipeline e.g. for
-    #     lighting calculations.
-    #
-    #     Returns:
-    #         C: a batch of 3D locations of shape (N, 3) denoting
-    #         the locations of the center of each camera in the batch.
-    #     """
-    #     # the camera center is the translation component (the last column) of the transform matrix P (3x4 RT matrix)
-    #     return self.camera_center #self.P[:, :, 3]
-
-
-
-    def project_points(
-        self, points, eps: Optional[float] = None, screen: bool = False
-    ) -> torch.Tensor:
-        """
-        Transforms points from world space to screen space.
-        Input points follow the SHDOM coordinate system conventions: +X[km] (North), +Y [km] (East), +Z[km] (Up).
-        Output points are in screen space: +X right, +Y down, origin at top left corner.
-
-        Args:
-            points: list of torch tensors, each of shape (..., 3).
-            eps: If eps!=None, the argument is used to clamp the
-                divisor in the homogeneous normalization of the points
-                transformed to the ndc space. Please see
-                `transforms.Transform3d.transform_points` for details.
-
-                For `CamerasBase.transform_points`, setting `eps > 0`
-                stabilizes gradients since it leads to avoiding division
-                by excessively low numbers for points close to the
-                camera plane.
-            screen: if True returns the projected points in pixels
-                    else in ndc space: X, Y in [-1 1]. For non square
-                    images, we scale the points such that largest side
-                    has range [-1, 1] and the smallest side has range
-                    [-u, u], with u < 1.
-
-        Returns
-            new_points: transformed points with the same shape as the input
-            except the last axis size is 2.
-        """
-        if points is not None:
-            points_out = [map[:,p,:] for map, p in zip([self.mapping], points)]
-        else:
-            points_out = [self.mapping]
-
-        return points_out
-
-    def project_pointsv2(
-        self, points, eps: Optional[float] = None, screen: bool = False
-    ) -> (torch.Tensor,torch.Tensor):
-        """
-        Transforms points from world space to screen space.
-        Input points follow the SHDOM coordinate system conventions: +X[km] (North), +Y [km] (East), +Z[km] (Up).
-        Output points are in screen space: +X right, +Y down, origin at top left corner.
-
-        Args:
-            points: list of torch tensors, each of shape (..., 3).
-            eps: If eps!=None, the argument is used to clamp the
-                divisor in the homogeneous normalization of the points
-                transformed to the ndc space. Please see
-                `transforms.Transform3d.transform_points` for details.
-
-                For `CamerasBase.transform_points`, setting `eps > 0`
-                stabilizes gradients since it leads to avoiding division
-                by excessively low numbers for points close to the
-                camera plane.
-            screen: if True returns the projected points in pixels
-                    else in ndc space: X, Y in [-1 1]. For non square
-                    images, we scale the points such that largest side
-                    has range [-1, 1] and the smallest side has range
-                    [-u, u], with u < 1.
-
-        Returns
-            new_points: transformed points with the same shape as the input
-            except the last axis size is 2.
-        """
-        if points is not None:
-            points_out = []
-            pixel_centers = []
-            for map, center, p in zip([self.mapping],[self.centers], points):
-
-                pixel_centers.append(center[:,:,p.to(center.device),:])
-                points_out.append(map[:,p.to(map.device),:])
-        else:
-            points = points[0]
-            points_out = [self.mapping[:,:,points,:]]
-            pixel_centers = [self.centers]
-
-        return points_out, pixel_centers
-
-    def clone(self):
-        """
-        Returns a copy of `self`.
-        """
-        cam_type = type(self)
-        other = cam_type(device=self.device)
-        return super().clone(other)
-
-
-
-class AirMSPICamerasV2(TensorProperties):
     """
     A class which stores a batch of parameters to generate a batch of
     transformation matrices using the multi-view geometry convention for
@@ -585,8 +442,6 @@ class AirMSPICamerasV2(TensorProperties):
         cam_type = type(self)
         other = cam_type(device=self.device)
         return super().clone(other)
-
-
 
 
 def _broadcast_bmm(a, b):

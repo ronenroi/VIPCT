@@ -34,8 +34,6 @@ def _xavier_init(linear):
     torch.nn.init.xavier_uniform_(linear.weight.data)
 
 
-
-
 class MLPWithInputSkips(torch.nn.Module):
     """
     Implements the multi-layer perceptron architecture of the Neural Radiance Field.
@@ -108,6 +106,7 @@ class MLPWithInputSkips(torch.nn.Module):
             y = layer(y)
         return y
 
+
 class MLPIdentity(torch.nn.Module):
     """
     Implements the multi-layer perceptron architecture of the Neural Radiance Field.
@@ -155,6 +154,7 @@ class MLPIdentity(torch.nn.Module):
             y: The output tensor of shape `(..., output_dim)`.
         """
         return x
+
 
 class MLPWithInputSkips2(torch.nn.Module):
     """

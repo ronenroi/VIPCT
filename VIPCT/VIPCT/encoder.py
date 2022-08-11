@@ -24,9 +24,6 @@ import torch.nn.functional as F
 import torchvision
 from .util import nn_util as util
 from .roi_align import ROIAlign
-# from model.custom_encoder import ConvEncoder
-import torch.autograd.profiler as profiler
-# from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from .MyResNetFPN import resnet_fpn_backbone
 class Backbone(nn.Module):
     """
@@ -305,72 +302,6 @@ class Backbone(nn.Module):
             n_sampling_nets = cfg.backbone.n_sampling_nets,
             to_flatten = cfg.backbone.feature_flatten,
             modify_first_layer = cfg.backbone.modify_first_layer
-        )
-
-
-class ImageEncoder(nn.Module):
-    """
-    Global image encoder
-    """
-
-    def __init__(self, backbone="resnet34", pretrained=True, latent_size=128):
-        """
-        :param backbone Backbone network. Assumes it is resnet*
-        e.g. resnet34 | resnet50
-        :param num_layers number of resnet layers to use, 1-5
-        :param pretrained Whether to use model pretrained on ImageNet
-        """
-        super().__init__()
-        self.model = getattr(torchvision.models, backbone)(pretrained=pretrained)
-        self.model.conv1 = nn.Conv2d(1, self.model.conv1.out_channels, kernel_size=self.model.conv1.kernel_size,
-                                     stride=self.model.conv1.stride, padding=self.model.conv1.padding,bias=self.model.bias)
-        self.model.fc = nn.Sequential()
-        self.register_buffer("latent", torch.empty(1, 1), persistent=False)
-        # self.latent (B, L)
-        self.latent_size = latent_size
-        if latent_size != 512:
-            self.fc = nn.Linear(512, latent_size)
-
-    def index(self, uv, cam_z=None, image_size=(), z_bounds=()):
-        """
-        Params ignored (compatibility)
-        :param uv (B, N, 2) only used for shape
-        :return latent vector (B, L, N)
-        """
-        return self.latent.unsqueeze(-1).expand(-1, -1, uv.shape[1])
-
-    def forward(self, x):
-        """
-        For extracting ResNet's features.
-        :param x image (B, C, H, W)
-        :return latent (B, latent_size)
-        """
-        x = x.to(device=self.latent.device)
-        x = self.model.conv1(x)
-        x = self.model.bn1(x)
-        x = self.model.relu(x)
-
-        x = self.model.maxpool(x)
-        x = self.model.layer1(x)
-        x = self.model.layer2(x)
-        x = self.model.layer3(x)
-        x = self.model.layer4(x)
-
-        x = self.model.avgpool(x)
-        x = torch.flatten(x, 1)
-
-        if self.latent_size != 512:
-            x = self.fc(x)
-
-        self.latent = x  # (B, latent_size)
-        return self.latent
-
-    @classmethod
-    def from_cfg(cls, cfg):
-        return cls(
-            cfg.get_string("backbone"),
-            pretrained=cfg.get_bool("pretrained", True),
-            latent_size=cfg.get_int("latent_size", 128),
         )
 
 

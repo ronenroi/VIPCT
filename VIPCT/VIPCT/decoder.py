@@ -15,12 +15,6 @@
 
 import torch
 from torch import nn
-import torch.nn.functional as F
-import torchvision
-from .util import nn_util as util
-from .roi_align import ROIAlign
-# from model.custom_encoder import ConvEncoder
-import torch.autograd.profiler as profiler
 from .mlp_function import MLPWithInputSkips2
 
 
@@ -40,7 +34,6 @@ class Decoder(nn.Module):
             type,
             average_cams,
             feature_flatten,
-            n_cam,
             latent_size,
             use_neighbours,
     ):
@@ -148,27 +141,6 @@ class Decoder(nn.Module):
             ),
             torch.nn.Linear(512, 3*out_size))
 
-        elif type == 'VIPCT':
-            linear1 = torch.nn.Linear(latent_size, 2048)
-            linear2 = torch.nn.Linear(2048, 512)
-            linear3 = torch.nn.Linear(512, 64)
-            linear4 = torch.nn.Linear(64, out_size)
-            _xavier_init(linear1)
-            _xavier_init(linear2)
-            _xavier_init(linear3)
-            _xavier_init(linear4)
-
-            self.decoder = torch.nn.Sequential(
-                linear1,
-                # torch.nn.BatchNorm1d(512),
-                torch.nn.ReLU(True),
-                linear2,
-                # torch.nn.BatchNorm1d(64),
-                torch.nn.ReLU(True),
-                linear3,
-                torch.nn.ReLU(True),
-                linear4
-            )
 
     def forward(self, x):
         if self.average_cams:
@@ -183,7 +155,6 @@ class Decoder(nn.Module):
             type = cfg.decoder.name,
             average_cams=cfg.decoder.average_cams,
             feature_flatten=cfg.decoder.feature_flatten,
-            n_cam = cfg.data.n_cam,
             latent_size = latent_size,
             use_neighbours = use_neighbours,
         )

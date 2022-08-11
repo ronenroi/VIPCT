@@ -26,14 +26,14 @@ from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
-from VIPCT.cameras import AirMSPICameras, AirMSPICamerasV2
+from VIPCT.cameras import AirMSPICameras, AirMSPICameras
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
 
-@hydra.main(config_path=CONFIG_DIR, config_name="basic_training_AirMSPI_varying")
+@hydra.main(config_path=CONFIG_DIR, config_name="vip-ct_train_airmspi")
 def main(cfg: DictConfig):
 
     # Set the relevant seeds for reproducibility.
@@ -56,7 +56,7 @@ def main(cfg: DictConfig):
     train_dataset, val_dataset = get_airmspi_datasets(cfg=cfg)
 
     # Initialize the CT model.
-    model = CTnetAirMSPIv2(cfg=cfg, n_cam=cfg.data.ncam)
+    model = CTnetAirMSPI(cfg=cfg, n_cam=cfg.data.ncam)
 
     # Move the model to the relevant device.
     model.to(device)
@@ -182,7 +182,7 @@ def main(cfg: DictConfig):
 
             images = torch.tensor(images, device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
-            cameras = AirMSPICamerasV2(mapping=torch.tensor(mapping).float(),
+            cameras = AirMSPICameras(mapping=torch.tensor(mapping).float(),
                                      centers=torch.tensor(centers).float(),
                                          device=device)
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]

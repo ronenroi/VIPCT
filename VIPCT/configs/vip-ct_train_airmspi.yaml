@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_AirMSPIv2_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_200_ext_div10/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_AirMSPIv2_varying_BOMEX_Res50_FPN_64_channels_Sampl_6_18_9cams_L2_relative_LR5.0e-05_query_150_ext_div10_NOIMG7/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 3
 debug: False
@@ -9,13 +9,13 @@ stats_print_interval: 25
 validation_iter_interval: 2500000000
 checkpoint_iteration_interval: 5000
 checkpoint_resume_path: ''#'/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
-gpu: 0
+gpu: 3
 data:
-  dataset_name: 'BOMEX_9cams' # 'BOMEX_9cams_varying'
+  dataset_name: 'BOMEX_aux_9cams' # 'BOMEX_9cams_varying'
   n_training: -1
   n_val: 40
-  n_cam: 9
-  drop_index: -1
+  n_cam: 8
+  drop_index: 7
   rand_cam: False
   mean: 0.017
   std: 0.0072
@@ -36,7 +36,7 @@ ct_net:
   n_layers_dir: 2
   append_xyz: [2]
   append_dir: [2]
-  n_query: 200
+  n_query: 150
   val_n_query: 50
   stop_encoder_grad: False
   dir_at_camera_coordinates: True
@@ -59,7 +59,7 @@ backbone:
   sampling_support: 6
   sampling_output_size: 18
   out_channels: 64
-  n_sampling_nets: 9
+  n_sampling_nets: 8
   feature_flatten: False
   modify_first_layer: True
 decoder:

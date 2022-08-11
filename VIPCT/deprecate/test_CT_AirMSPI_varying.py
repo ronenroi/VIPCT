@@ -29,7 +29,7 @@ from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
-from VIPCT.cameras import AirMSPICamerasV2
+from VIPCT.cameras import AirMSPICameras
 import scipy.io as sio
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
@@ -66,7 +66,7 @@ def main(cfg: DictConfig):
     cfg = OmegaConf.merge(net_cfg,cfg)
 
     # Initialize VIP-CT model
-    model = CTnetAirMSPIv2(cfg=cfg, n_cam=cfg.data.n_cam)
+    model = CTnetAirMSPI(cfg=cfg, n_cam=cfg.data.n_cam)
 
     # Load model
     assert os.path.isfile(checkpoint_resume_path)
@@ -150,7 +150,7 @@ def main(cfg: DictConfig):
     gz = np.linspace(0, 0.04 * 32, 32, dtype=np.float32)
     grid = [np.array([gx,gy,gz])]
     val_volume = Volumes(torch.unsqueeze(torch.tensor(masks, device=device).float(), 1), grid)
-    val_camera = AirMSPICamerasV2(mapping=torch.tensor(images_mapping_list, device=device).float(),
+    val_camera = AirMSPICameras(mapping=torch.tensor(images_mapping_list, device=device).float(),
                                   centers=torch.tensor(pixel_centers_list).float(),
                              device=device)
 

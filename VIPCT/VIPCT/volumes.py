@@ -19,18 +19,11 @@
 
 
 import copy
-
-# import shdom
-# from shdom import Grid
 import torch
 from .util.types import Device, make_device
 from typing import List, Sequence, Tuple, Union
-import numpy as np
-
 
 _TensorBatch = Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor]]
-# _GridBatch = Union[shdom.Grid, List[shdom.Grid], Tuple[shdom.Grid], np.ndarray]
-
 
 class Volumes:
     """
@@ -40,9 +33,9 @@ class Volumes:
     VOLUME DENSITIES
 
     The Volumes class can be either constructed from a 5D tensor of
-    `extinctions` of size `batch x density_dim x depth x height x width` or
+    `extinctions` of size `batch x property_dim x depth x height x width` or
     from a list of differently-sized 4D tensors `[D_1, ..., D_batch]`,
-    where each `D_i` is of size `[density_dim x depth_i x height_i x width_i]`.
+    where each `D_i` is of size `[property_dim x depth_i x height_i x width_i]`.
 
     In case the `Volumes` object is initialized from the list of `extinctions`,
     the list of tensors is internally converted to a single 5D tensor by
@@ -73,7 +66,7 @@ class Volumes:
         self,
         extinctions: _TensorBatch,
         grid,
-        ext_thr = 1
+        ext_thr = 0
     ) -> None:
         """
         Args:
@@ -241,7 +234,6 @@ class Volumes:
             NotImplementedError()
         ext = [e.T for e in ext]
         return ext, query_points, indices
-
 
     def get_query_points_and_neighbours(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
 

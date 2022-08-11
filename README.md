@@ -1,5 +1,5 @@
 # VIP-CT: Variable Imaging Projection Cloud Scattering Tomography
-[![arXiv](https://img.shields.io/static/v1?label=ICCP2022&message=VIP-CT&color=blueviolet)](https://github.com/ronenroi/VIPCT)
+[![arXiv](https://img.shields.io/static/v1?label=ICCP2022|TPAMI&message=VIP-CT&color=blueviolet)](https://ieeexplore.ieee.org/abstract/document/9847357)
 
 ## Abstract
 Scattering-based computed tomography (CT) recovers a heterogeneous volumetric scattering medium using images taken
@@ -17,12 +17,12 @@ for a learning-based solution to nonlinear CT problems in other scientific domai
 ![VIP-CT](readme_files/framework.png)
 
 ## Description
-This repository contains the official implementation of Variable Imaging Projection Cloud Scattering Tomography, publishd in ICCP 2022.
+This repository contains the official implementation of Variable Imaging Projection Cloud Scattering Tomography, accepted for publication in IEEE Transactions on Pattern Analysis and Machine Intelligence, and presented at ICCP 2022.
 Our framework preforms fast scattering tomography of clouds for variable viewing
 geometries and resolutions. The core of VIP-CT is a decoder, which assigns each 3D
 voxel location an estimated value of the sought cloud extinction. The decoder has two inputs. One is a vector of image
 features, associated with this voxel.  The other is a set of vectors that express 3D geometry relating to the voxel
-location and the set of viewpoints.  For more details see our paper and supplementary material.
+location and the set of viewpoints.  For more details see our [paper](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9847357) and [supplementary material](https://ieeexplore.ieee.org/ielx7/34/4359286/9847357/supp1-3195920.pdf?arnumber=9847357).
 
 ![results](readme_files/3d_scatter.png)
 
@@ -110,11 +110,12 @@ The AirMSPI trained model can be downloaded here.
 ## Citation
 If you make use of our work, please cite our paper:
 ```
-@InProceedings{Ronen_2022_ICCP,
-    author    = {Ronen, Roi and Holodovsky, Vadim and Schechner, Yoav Y.},
-    title     = {Variable Imaging Projection Cloud Scattering Tomography},
-    booktitle = {Proceedings of the IEEE International Conference on Computational Photography},
-    year      = {2022},
+@article{ronen2022variable,
+  title={Variable Imaging Projection Cloud Scattering Tomography},
+  author={Ronen, Roi and Holodovsky, Vadim and Schechner, Yoav Y},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year={2022},
+  publisher={IEEE}
 }
 ```
 Thanks to Eshkol Eytan for the cloud simulation data. If you use it please cite:

@@ -23,7 +23,7 @@ import hydra
 import numpy as np
 import torch
 from VIPCT.visualization import SummaryWriter
-from VIPCT.dataset import get_cloud_microphysics_datasets, trivial_collate
+from VIPCT.microphysics_dataset import get_cloud_microphysics_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf
@@ -116,12 +116,12 @@ def main(cfg: DictConfig):
     net_cfg = OmegaConf.load(resume_cfg_path)
     cfg=OmegaConf.merge(net_cfg,cfg)
     # DATA_DIR = os.path.join(current_dir, "data")
-    _, val_dataset, n_cam = get_cloud_microphysics_datasets(
+    _, val_dataset = get_cloud_microphysics_datasets(
         cfg=cfg
     )
 
     # Initialize the Radiance Field model.
-    model = CTnetMicrophysics(cfg=cfg, n_cam=n_cam)
+    model = CTnetMicrophysics(cfg=cfg, n_cam=cfg.data.n_cam)
 
     # Move the model to the relevant device.
 

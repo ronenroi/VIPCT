@@ -56,7 +56,7 @@ def main(cfg: DictConfig):
     train_dataset, val_dataset = get_airmspi_datasets(cfg=cfg)
 
     # Initialize the CT model.
-    model = CTnetAirMSPI(cfg=cfg, n_cam=cfg.data.ncam)
+    model = CTnetAirMSPI(cfg=cfg, n_cam=cfg.data.n_cam)
 
     # Move the model to the relevant device.
     model.to(device)

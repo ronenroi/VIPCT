@@ -28,8 +28,7 @@ import socket
 import random
 import scipy.io as sio
 
-DEFAULT_DATA_ROOT = '/home/roironen/Data' \
-if not socket.gethostname() == 'visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data'
+DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
 def trivial_collate(batch):
     """
@@ -201,7 +200,7 @@ ALL_DATASETS_AIRMSPI = ("BOMEX_aux_9cams", "32N123W_experiment_cloud1", "32N123W
 #
 #     if dataset_name == 'BOMEX_9cams':
 #         data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-#         image_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/AirMSPI/LOW_SC/AIRMSPI_IMAGES_LWC_LOW_SC'
+#         image_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/AirMSPI/test/LOW_SC/AIRMSPI_IMAGES_LWC_LOW_SC'
 #         mapping_path = '/wdata/roironen/Data/voxel_pixel_list32x32x32_BOMEX_img350x350.pkl'
 #         with open(mapping_path, 'rb') as f:
 #             mapping = pickle.load(f)
@@ -337,11 +336,10 @@ def get_airmspi_datasets(
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 
     if dataset_name == 'BOMEX_aux_9cams':
-        data_root = os.path.join(data_root, '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train')
-        image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/'
-        # mapping_paths = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebat_voxel_pixel_list32x32x32_BOMEX_img350x350_20160826_104727Z_SouthAtlanticOcean-14S19W.pkl'
-        mapping_paths = [f for f in glob.glob('/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebat_voxel_pixel_list32x32x32_BOMEX_img350x350*.pkl')]
-        pixel_center_paths = [f for f in glob.glob('/wdata/roironen/Data/AirMSPI-Varying/training/*.mat')]
+        cloud_train_path = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras_20m/train') # use 3D clouds from here
+        image_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256/AirMSPI_pushbroom_camera') # use push-broom rendered images
+        mapping_paths = [f for f in glob.glob(os.path.join(data_root, 'AirMSPI/test/training/voxel_pixel_list*.pkl'))]
+        pixel_center_paths = [f for f in glob.glob(os.path.join(data_root, 'AirMSPI/test/training/pixel_centers_*.mat'))]
         image_size = [350, 350]
     else:
         NotImplementedError()
@@ -376,18 +374,17 @@ def get_airmspi_datasets(
     #     images_mapping_lists.append((images_mapping_list))
     #     pixel_centers_lists.append(pixel_centers_list)
     # print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-    # with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl', 'wb') as f:
+    # with open(os.path.join(data_root, 'AirMSPI/test/training/images_mapping.pkl') as f:
     #     pickle.dump(images_mapping_lists, f, pickle.HIGHEST_PROTOCOL)
-    # with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl', 'wb') as f:
+    # with open(os.path.join(data_root, 'AirMSPI/test/training/pixel_centers.pkl') as f:
     #     pickle.dump(pixel_centers_lists, f, pickle.HIGHEST_PROTOCOL)
-    with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl', 'rb') as f:
-        images_mapping_lists = pickle.load(f)
-    with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl', 'rb') as f:
-        pixel_centers_lists = pickle.load(f)
+    with open(os.path.join(data_root, 'AirMSPI/test/training/images_mapping.pkl'), 'rb') as f:
+        images_mapping_lists = pickle.load(f) # pre-computed voxel-pixel mapping
+    with open(os.path.join(data_root, 'AirMSPI/test/training/pixel_centers.pkl'), 'rb') as f:
+        pixel_centers_lists = pickle.load(f) # pre-computed 3D pixel center
     image_train_paths = [f for f in glob.glob(os.path.join(image_root, "SIMULATED_AIRMSPI_TRAIN*"))]
     image_train_paths = [glob.glob(os.path.join(f, "*.pkl")) for f in image_train_paths]
 
-    cloud_train_path = data_root
     assert cfg.data.n_training <= 0
 
     n_cam = cfg.data.n_cam
@@ -410,6 +407,7 @@ def get_airmspi_datasets(
 
 def get_real_world_airmspi_datasets(
     cfg,
+    data_root: str = DEFAULT_DATA_ROOT,
 ) -> Tuple[Dataset]:
     """
     Obtains the training and validation dataset object for a dataset specified
@@ -425,16 +423,17 @@ def get_real_world_airmspi_datasets(
         val_dataset: The validation dataset object.
         test_dataset: The testing dataset object.
     """
+
     dataset_name = cfg.data.dataset_name
 
     if dataset_name not in ALL_DATASETS_AIRMSPI:
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 
     if dataset_name == '32N123W_experiment_cloud1':
-        image_path = '/wdata/yaelsc/AirMSPI_raw_data/raw_data/croped_airmspi_9images_for_Roi.mat'
-        mapping_path = '/wdata/roironen/Data/AirMSPI-Varying/test/rebat_images_mapping_lists72x72x32_BOMEX_img350x350.pkl'
-        pixel_centers_path = '/wdata/roironen/Data/AirMSPI-Varying/test/rebat_pixel_centers_lists72x72x32_BOMEX_img350x350.pkl'
-        mask_path = '/wdata/roironen/Data/mask_72x72x32_vox50x50x40mROI.mat'
+        image_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/airmspi_9images.mat")
+        mapping_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/images_mapping.pkl")
+        pixel_centers_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/pixel_centers.pkl")
+        mask_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/mask_72x72x32_vox50x50x40m.mat")
         dx = 0.05
         dy = 0.05
         dz = 0.04
@@ -442,10 +441,10 @@ def get_real_world_airmspi_datasets(
         ny = 72
         nz = 32
     elif dataset_name == '32N123W_experiment_cloud2':
-        image_path = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/32N123W_experiment/croped_airmspi_9images_for_Roi.mat'
-        mapping_path = '/wdata/roironen/Data/AirMSPI-Varying/test/32N123W_rebat_images_mapping_lists60x60x32_18S8E_img350x350.pkl'
-        pixel_centers_path = '/wdata/roironen/Data/AirMSPI-Varying/test/32N123W_rebat_pixel_centers_lists60x60x32_18S8E_img350x350.pkl'
-        mask_path = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/32N123W_experiment/mask_60x60x32_vox50x50x40m.mat'
+        image_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/airmspi_9images.mat")
+        mapping_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/images_mapping.pkl")
+        pixel_centers_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/pixel_centers.pkl")
+        mask_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/mask_60x60x32_vox50x50x40m.mat")
         dx = 0.05
         dy = 0.05
         dz = 0.04
@@ -453,10 +452,10 @@ def get_real_world_airmspi_datasets(
         ny = 60
         nz = 32
     elif dataset_name == '18S8E_experiment':
-        image_path = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/18S8E_experiment/croped_airmspi_9images_for_Roi.mat'
-        mapping_path = '/wdata/roironen/Data/AirMSPI-Varying/test/rebat_images_mapping_lists32x32x32_18S8E_img350x350.pkl'
-        pixel_centers_path = '/wdata/roironen/Data/AirMSPI-Varying/test/rebat_pixel_centers_lists32x32x32_18S8E_img350x350.pkl'
-        mask_path = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/rebatel_iccp22/18S8E_experiment/mask_52x52x32_vox50x50x40m.mat'
+        image_path = os.path.join(data_root, "AirMSPI/test/18S8E_experiment/airmspi_9images.mat")
+        mapping_path = os.path.join(data_root, "AirMSPI/test/18S8E_experiment/images_mapping.pkl")
+        pixel_centers_path = os.path.join(data_root, "AirMSPI/test/18S8E_experiment/pixel_centers.pkl")
+        mask_path = os.path.join(data_root, "AirMSPI/test/18S8E_experiment/mask_52x52x32_vox50x50x40m.mat")
         dx = 0.05
         dy = 0.05
         dz = 0.04
@@ -578,7 +577,7 @@ class AirMSPIDataset(Dataset):
         images -= self.mean
         images /= self.std
         grid = data['grid']
-        extinction = data['ext'] / 10 # images are of BOMEX_aux dataset while ext of BOMEX
+        extinction = data['ext'] / 10 # convert BOMEX clouds to BOMEX_aux clouds
 
         images_mapping_list = [np.array(map)[mask.ravel()] for map in self.mapping[geometry_ind]]
         pixel_centers = [np.array(centers)[mask.ravel()] for centers in self.pixel_centers[geometry_ind]]

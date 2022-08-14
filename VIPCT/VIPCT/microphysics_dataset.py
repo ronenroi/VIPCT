@@ -28,13 +28,9 @@ import socket
 import random
 import scipy.io as sio
 
-DEFAULT_DATA_ROOT = '/home/roironen/Data' \
-if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data'
+DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
-ALL_DATASETS = ("BOMEX_10cams_polarization", "BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams",
-                "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2",
-                "BOMEX_10cams_varyingV3", "BOMEX_10cams_varyingV4",
-                "subset_of_seven_clouds")
+ALL_DATASETS = ("BOMEX_10cams_polarization")
 
 
 def trivial_collate(batch):

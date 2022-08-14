@@ -32,8 +32,8 @@ DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
 
 ALL_DATASETS = ("BOMEX_CASS_10cams_20m", "CASS_10cams_20m", "CASS_10cams_50m", "BOMEX_10cams_20m",
-                "BOMEX_10cams_50m", "BOMEX_32cams_20m", "BOMEX_32cams_50m", "10cameras_20m_varying_S", "10cameras_20m_varying_M",
-                "10cameras_20m_varying_L", "10cameras_20m_varying_XL",
+                "BOMEX_10cams_50m", "BOMEX_32cams_20m", "BOMEX_32cams_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
+                "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds")
 
 
@@ -75,20 +75,20 @@ def get_cloud_datasets(
     elif dataset_name == 'CASS_10cams_50m':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
         image_size = [96, 96]
-    elif dataset_name == 'BOMEX_10cams':
+    elif dataset_name == 'BOMEX_10cams_20m':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
         image_size = [116, 116]
-    elif dataset_name == '10cameras_20m_varying_S':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positions')
+    elif dataset_name == 'BOMEX_10cameras_20m_varying_S':
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_S')
         image_size = [116, 116]
-    elif dataset_name == '10cameras_20m_varying_M':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV2')
+    elif dataset_name == 'BOMEX_10cameras_20m_varying_M':
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_M')
         image_size = [116, 116]
-    elif dataset_name == '10cameras_20m_varying_L':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV3')
+    elif dataset_name == 'BOMEX_10cameras_20m_varying_L':
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_L')
         image_size = [116, 116]
-    elif dataset_name == '10cameras_20m_varying_XL':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV4')
+    elif dataset_name == 'BOMEX_10cameras_20m_varying_XL':
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_XL')
         image_size = [116, 116]
     elif dataset_name == 'BOMEX_10cams_50m':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')

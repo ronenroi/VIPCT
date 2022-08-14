@@ -407,7 +407,7 @@ class CTnetAirMSPI(torch.nn.Module):
 
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
         del image
-        # mask = self.mask_net(image_features)
+
         if self.training:
             if self.use_neighbours:
                 volume, query_points, query_indices = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)

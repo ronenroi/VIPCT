@@ -59,12 +59,12 @@ def main(cfg: DictConfig):
     # Load the training/validation data.
     current_dir = os.path.dirname(os.path.realpath(__file__))
     # DATA_DIR = os.path.join(current_dir, "data")
-    train_dataset, val_dataset, n_cam = get_cloud_datasets(
+    train_dataset, val_dataset = get_cloud_datasets(
         cfg=cfg
     )
 
     # Initialize the CT model.
-    model = CTnet(cfg=cfg, n_cam=n_cam)
+    model = CTnet(cfg=cfg, n_cam=cfg.data.n_cam)
 
     # Move the model to the relevant device.
     model.to(device)

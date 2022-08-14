@@ -10,7 +10,7 @@ checkpoint_iteration_interval: 5000
 checkpoint_resume_path: ''
 gpu: 0
 data:
-  dataset_name: 'BOMEX_10cams'
+  dataset_name: 'BOMEX_10cameras_20m'
   n_training: -1
   n_val: 40
   n_cam: 10

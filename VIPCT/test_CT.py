@@ -75,9 +75,8 @@ def main(cfg: DictConfig):
     _, val_dataset = get_cloud_datasets(
         cfg=cfg
     )
-    n_cam = cfg.data.n_cam
     # Initialize VIP-CT model
-    model = CTnet(cfg=cfg, n_cam=n_cam)
+    model = CTnet(cfg=cfg, n_cam=cfg.data.n_cam)
 
     # Load model
     assert os.path.isfile(checkpoint_resume_path)

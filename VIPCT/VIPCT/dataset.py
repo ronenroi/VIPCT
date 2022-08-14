@@ -28,12 +28,12 @@ import socket
 import random
 import scipy.io as sio
 
-DEFAULT_DATA_ROOT = '/home/roironen/Data' \
-if not socket.gethostname()=='visl-25u' else '/media/roironen/8AAE21F5AE21DB09/Data'
+DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
-ALL_DATASETS = ("BOMEX_10cams_polarization", "BOMEX_CASS_10cams", "CASS_10cams", "CASS_10cams_50m", "BOMEX_10cams",
-                "BOMEX_10cams_50m", "BOMEX_32cams", "BOMEX_32cams_50m", "BOMEX_10cams_varying", "BOMEX_10cams_varyingV2",
-                "BOMEX_10cams_varyingV3", "BOMEX_10cams_varyingV4",
+
+ALL_DATASETS = ("BOMEX_CASS_10cams_20m", "CASS_10cams_20m", "CASS_10cams_50m", "BOMEX_10cams_20m",
+                "BOMEX_10cams_50m", "BOMEX_32cams_20m", "BOMEX_32cams_50m", "10cameras_20m_varying_S", "10cameras_20m_varying_M",
+                "10cameras_20m_varying_L", "10cameras_20m_varying_XL",
                 "subset_of_seven_clouds")
 
 
@@ -67,56 +67,45 @@ def get_cloud_datasets(
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 
     if dataset_name == 'CASS_10cams':
-        data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
+        data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
         image_size = [236, 236]
-    elif dataset_name == 'BOMEX_CASS_10cams':
-        data_root_cass = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/64_64_32_cloud_fields')
-        data_root_bomex = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras')
-        # image_size = [236, 236]
+    elif dataset_name == 'BOMEX_CASS_10cams_20m':
+        data_root_cass = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_20m')
+        data_root_bomex = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
     elif dataset_name == 'CASS_10cams_50m':
-        data_root = data_root.replace('home', 'wdata')
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
         image_size = [96, 96]
     elif dataset_name == 'BOMEX_10cams':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
         image_size = [116, 116]
-    elif dataset_name == 'BOMEX_10cams_varying':
-        data_root = data_root.replace('home', 'wdata')
+    elif dataset_name == '10cameras_20m_varying_S':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positions')
         image_size = [116, 116]
-    elif dataset_name == 'BOMEX_10cams_varyingV2':
-        data_root = data_root.replace('home', 'wdata')
+    elif dataset_name == '10cameras_20m_varying_M':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV2')
         image_size = [116, 116]
-    elif dataset_name == 'BOMEX_10cams_varyingV3':
-        data_root = data_root.replace('home', 'wdata')
+    elif dataset_name == '10cameras_20m_varying_L':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV3')
         image_size = [116, 116]
-    elif dataset_name == 'BOMEX_10cams_varyingV4':
-        data_root = data_root.replace('home', 'wdata')
+    elif dataset_name == '10cameras_20m_varying_XL':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', 'varying_positionsV4')
         image_size = [116, 116]
     elif dataset_name == 'BOMEX_10cams_50m':
-        data_root = data_root.replace('home', 'wdata')
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
         image_size = [48, 48]
     elif dataset_name == 'BOMEX_32cams_50m':
-        data_root = data_root.replace('home', 'wdata')
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_50m')
         image_size = [48, 48]
     elif dataset_name == 'BOMEX_32cams':
-        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras')
+        data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_20m')
         image_size = [116, 116]
     elif dataset_name == 'subset_of_seven_clouds':
-        data_root = data_root.replace('home', 'wdata')
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
         image_size = [48, 48]
     else:
-        data_root = os.path.join(data_root,'BOMEX_256x256x100_5000CCN_50m_micro_256/roi',dataset_name)
-        image_size = [236, 236]
-    # image_size = cfg.data.image_size
+        FileNotFoundError()
 
-    if not dataset_name == 'BOMEX_CASS_10cams':
+    if not dataset_name == 'BOMEX_CASS_10cams_20m':
         print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
         data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
     else:
@@ -141,10 +130,10 @@ def get_cloud_datasets(
     dataset_name = dataset_name,
 
     )
-    if not (dataset_name == 'BOMEX_CASS_10cams' or dataset_name == 'subset_of_seven_clouds'):
+    if not (dataset_name == 'BOMEX_CASS_10cams_20m' or dataset_name == 'subset_of_seven_clouds'):
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
     elif dataset_name == 'subset_of_seven_clouds':
-        val_paths = [f for f in glob.glob(os.path.join('/wdata/roironen/Data/subset_of_seven_clouds', "cloud*.pkl"))]
+        val_paths = [f for f in glob.glob(os.path.join(data_root, "subset_of_seven_clouds/cloud*.pkl"))]
         print(val_paths)
     else:
         val_paths = [f for f in glob.glob(os.path.join(data_root_cass, "test/cloud*.pkl"))]
@@ -189,6 +178,7 @@ class CloudDataset(Dataset):
         elif self.mask_type == 'space_carving_0.9':
             mask = data['mask0.9']
         if 'varying' in self.dataset_name:
+            # randomly sample a perturbation out of the tenth simulated data
             index = torch.randperm(10)[0]
             cam_i = torch.arange(index,100,10)
             mask = mask[index] if mask is not None else None
@@ -198,7 +188,6 @@ class CloudDataset(Dataset):
         images -= self.mean
         images /= self.std
 
-        # grid = data['net_grid']
         if hasattr(data, 'image_sizes'):
             image_sizes = data['image_sizes'][cam_i]
         else:
@@ -208,18 +197,4 @@ class CloudDataset(Dataset):
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
 
-        # if cloud_path == '/wdata/roironen/Data/subset_of_seven_clouds/cloud_results_BOMEX_13x25x36_28440.pkl':
-        #     import scipy.io as sio
-        #     images = sio.loadmat('/wdata/roironen/Data/subset_of_seven_clouds/satellites_images/satellites_images_28440.mat')['satellites_images']
-        #     images -= self.mean
-        #     images /= self.std
-        #     extinction = sio.loadmat('/wdata/roironen/Data/subset_of_seven_clouds/lwcs/cloud28440.mat')['GT']
-        #     mask = sio.loadmat('/wdata/roironen/Data/subset_of_seven_clouds/masks/mask_28440.mat')['CARVER']
-
-        # train_ext.append(train_data['ext'])
-
-        # if self.transform:
-        #     image = self.transform(image)
-        # if self.target_transform:
-        #     label = self.target_transform(label)
         return images, extinction, grid, image_sizes, projection_matrix, camera_center, mask

@@ -127,7 +127,7 @@ class PerspectiveCameras(TensorProperties):
             the locations of the center of each camera in the batch.
         """
         # the camera center is the translation component (the last column) of the transform matrix P (3x4 RT matrix)
-        return self.camera_center #self.P[:, :, 3]
+        return self.camera_center
 
 
     def _transform_points_old(self, points, eps: Optional[float] = None) -> List[torch.Tensor]:
@@ -154,16 +154,7 @@ class PerspectiveCameras(TensorProperties):
             ones = torch.ones(p.shape[0], 1, dtype=p.dtype, device=p.device)
             points_batch.append(torch.cat([p, ones], dim=1))
 
-        # points_batch = [p.clone() ]
-        # if points_batch.dim() == 2:
-        #     points_batch = points_batch[None]  # (P, 3) -> (1, P, 3)
-        # if points_batch.dim() != 3:
-        #     msg = "Expected points to have dim = 2 or dim = 3: got shape %r"
-        #     raise ValueError(msg % repr(points.shape))
-
-        # N, P, _3 = points_batch.shape
-
-        composed_matrices = self.P#[self.index,...]
+        composed_matrices = self.P
         if composed_matrices.dim() == 3:
             composed_matrices = composed_matrices[None]
         composed_matrices = composed_matrices.transpose(-2, -1)
@@ -174,11 +165,6 @@ class PerspectiveCameras(TensorProperties):
                 d_sign = d.sign() + (d == 0.0).type_as(d)
                 denom[i] = d_sign * torch.clamp(d.abs(), eps)
         points_out = [out[..., :2] / d for out, d in zip(points_out, denom)]
-
-        # When transform is (1, 4, 4) and points is (P, 3) return
-        # points_out of shape (P, 3)
-        # if points_out.shape[0] == 1 and points.dim() == 2:
-        #     points_out = points_out.reshape(points.shape[0],-1)
 
         return points_out
 
@@ -207,16 +193,7 @@ class PerspectiveCameras(TensorProperties):
             ones = torch.ones(p.shape[0], 1, dtype=p.dtype, device=p.device)
             points_batch.append(torch.cat([p, ones], dim=1))
 
-        # points_batch = [p.clone() ]
-        # if points_batch.dim() == 2:
-        #     points_batch = points_batch[None]  # (P, 3) -> (1, P, 3)
-        # if points_batch.dim() != 3:
-        #     msg = "Expected points to have dim = 2 or dim = 3: got shape %r"
-        #     raise ValueError(msg % repr(points.shape))
-
-        # N, P, _3 = points_batch.shape
-
-        composed_matrices = self.P#[self.index,...]
+        composed_matrices = self.P
         if composed_matrices.dim() == 3:
             composed_matrices = composed_matrices[None]
         composed_matrices = composed_matrices.transpose(-2, -1)
@@ -227,11 +204,6 @@ class PerspectiveCameras(TensorProperties):
                 d_sign = d.sign() + (d == 0.0).type_as(d)
                 denom[i] = d_sign * torch.clamp(d.abs(), eps)
         points_out = [out[..., [1,0]] / d for out, d in zip(points_out, denom)]
-
-        # When transform is (1, 4, 4) and points is (P, 3) return
-        # points_out of shape (P, 3)
-        # if points_out.shape[0] == 1 and points.dim() == 2:
-        #     points_out = points_out.reshape(points.shape[0],-1)
 
         return points_out
 
@@ -273,7 +245,7 @@ class PerspectiveCameras(TensorProperties):
         return points_out
 
     def _to_screen_transform(self, points):
-        image_size = torch.unsqueeze(self.image_size, 2)  # self.image_size[self.index].view(points.shape[1],1, 2)  # of shape (1 or B)x2
+        image_size = torch.unsqueeze(self.image_size, 2)
         for i, p in enumerate(points):
             if p.shape[-1]==3:
                 p = p[...,:2]
@@ -287,24 +259,6 @@ class PerspectiveCameras(TensorProperties):
         cam_type = type(self)
         other = cam_type(device=self.device)
         return super().clone(other)
-
-
-
-
-
-    # def unproject_points(
-    #     self, xy_depth: torch.Tensor, world_coordinates: bool = True, **kwargs
-    # ) -> torch.Tensor:
-    #     if world_coordinates:
-    #         to_camera_transform = self.get_full_projection_transform(**kwargs)
-    #     else:
-    #         to_camera_transform = self.get_projection_transform(**kwargs)
-    #
-    #     unprojection_transform = to_camera_transform.inverse()
-    #     xy_inv_depth = torch.cat(
-    #         (xy_depth[..., :2], 1.0 / xy_depth[..., 2:3]), dim=-1  # type: ignore
-    #     )
-    #     return unprojection_transform.transform_points(xy_inv_depth)
 
 
 class AirMSPICameras(TensorProperties):
@@ -329,33 +283,6 @@ class AirMSPICameras(TensorProperties):
         )
         self.mapping = mapping
         self.centers = centers
-
-        # if (self.image_size < 1).any():  # pyre-ignore
-        #     raise ValueError("Image_size provided has invalid values")
-
-
-    # def get_camera_center(self) -> torch.Tensor:
-    #     """
-    #     Return the 3D location of the camera optical center
-    #     in the world coordinates.
-    #
-    #     Args:
-    #         **kwargs: parameters for the camera extrinsics can be passed in
-    #             as keyword arguments to override the default values
-    #             set in __init__.
-    #
-    #     Setting T here will update the values set in init as this
-    #     value may be needed later on in the rendering pipeline e.g. for
-    #     lighting calculations.
-    #
-    #     Returns:
-    #         C: a batch of 3D locations of shape (N, 3) denoting
-    #         the locations of the center of each camera in the batch.
-    #     """
-    #     # the camera center is the translation component (the last column) of the transform matrix P (3x4 RT matrix)
-    #     return self.camera_center #self.P[:, :, 3]
-
-
 
     def project_points(
         self, points, eps: Optional[float] = None, screen: bool = False
@@ -426,9 +353,7 @@ class AirMSPICameras(TensorProperties):
             assert len(points)==1
             points_out = self.mapping[:,:,points[0],:].to(device=self.device)
             pixel_centers = self.centers[:,:,points[0],:].to(device=self.device)
-        #     for map, center, p in zip(self.mapping,self.centers, points):
-        #         pixel_centers.append(center[:,p,:].to(device=self.device))
-        #         points_out.append(map[:,p,:].to(device=self.device))
+
         else:
             points_out = self.mapping
             pixel_centers = self.centers
@@ -478,7 +403,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from volumes import Volumes
 
-
+    #test camera projection
     def sample_features(latents, uv):
         """
         Get pixel-aligned image features at 2D image coordinates

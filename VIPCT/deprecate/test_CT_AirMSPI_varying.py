@@ -22,8 +22,8 @@ import warnings
 import hydra
 import numpy as np
 import torch
-from VIPCT.visualization import SummaryWriter
-from VIPCT.dataset import get_cloud_datasets, trivial_collate
+from VIPCT.util.visualization import SummaryWriter
+from dataloder.dataset import get_cloud_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf

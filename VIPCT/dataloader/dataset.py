@@ -31,8 +31,8 @@ import scipy.io as sio
 DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
 
-ALL_DATASETS = ("BOMEX_CASS_10cams_20m", "CASS_10cams_20m", "CASS_10cams_50m", "BOMEX_10cams_20m",
-                "BOMEX_10cams_50m", "BOMEX_32cams_20m", "BOMEX_32cams_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
+ALL_DATASETS = ("BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",
+                "BOMEX_10cameras_50m", "BOMEX_32cameras_20m", "BOMEX_32cameras_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
                 "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds")
 
@@ -66,16 +66,16 @@ def get_cloud_datasets(
     if dataset_name not in ALL_DATASETS:
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 
-    if dataset_name == 'CASS_10cams':
+    if dataset_name == 'CASS_10cameras':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
         image_size = [236, 236]
-    elif dataset_name == 'BOMEX_CASS_10cams_20m':
+    elif dataset_name == 'BOMEX_CASS_10cameras_20m':
         data_root_cass = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_20m')
         data_root_bomex = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
-    elif dataset_name == 'CASS_10cams_50m':
+    elif dataset_name == 'CASS_10cameras_50m':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
         image_size = [96, 96]
-    elif dataset_name == 'BOMEX_10cams_20m':
+    elif dataset_name == 'BOMEX_10cameras_20m':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
         image_size = [116, 116]
     elif dataset_name == 'BOMEX_10cameras_20m_varying_S':
@@ -90,13 +90,13 @@ def get_cloud_datasets(
     elif dataset_name == 'BOMEX_10cameras_20m_varying_XL':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_XL')
         image_size = [116, 116]
-    elif dataset_name == 'BOMEX_10cams_50m':
+    elif dataset_name == 'BOMEX_10cameras_50m':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
         image_size = [48, 48]
-    elif dataset_name == 'BOMEX_32cams_50m':
+    elif dataset_name == 'BOMEX_32cameras_50m':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_50m')
         image_size = [48, 48]
-    elif dataset_name == 'BOMEX_32cams':
+    elif dataset_name == 'BOMEX_32cameras':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_20m')
         image_size = [116, 116]
     elif dataset_name == 'subset_of_seven_clouds':
@@ -105,7 +105,7 @@ def get_cloud_datasets(
     else:
         FileNotFoundError()
 
-    if not dataset_name == 'BOMEX_CASS_10cams_20m':
+    if not dataset_name == 'BOMEX_CASS_10cameras_20m':
         print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
         data_train_paths = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
     else:
@@ -130,7 +130,7 @@ def get_cloud_datasets(
     dataset_name = dataset_name,
 
     )
-    if not (dataset_name == 'BOMEX_CASS_10cams_20m' or dataset_name == 'subset_of_seven_clouds'):
+    if not (dataset_name == 'BOMEX_CASS_10cameras_20m' or dataset_name == 'subset_of_seven_clouds'):
         val_paths = [f for f in glob.glob(os.path.join(data_root, "test/cloud*.pkl"))]
     elif dataset_name == 'subset_of_seven_clouds':
         val_paths = [f for f in glob.glob(os.path.join(data_root, "subset_of_seven_clouds/cloud*.pkl"))]

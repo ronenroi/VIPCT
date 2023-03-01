@@ -13,20 +13,19 @@
 # This source code is licensed under the Apache License 2.0 found in the
 # LICENSE file in the root directory of this source tree.
 
-import collections
-import os, time
+import os
 import pickle
 import warnings
 import hydra
 import numpy as np
-import torch
-from VIPCT.visualization import SummaryWriter
-from VIPCT.airmspi_dataset import get_airmspi_datasets, trivial_collate
+from VIPCT.VIPCT.util.visualization import SummaryWriter
+from VIPCT.dataloader.airmspi_dataset import get_airmspi_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
-from VIPCT.cameras import AirMSPICameras, AirMSPICameras
+from VIPCT.scene.cameras import AirMSPICameras
+from VIPCT.scene.volumes import Volumes
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)

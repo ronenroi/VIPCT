@@ -15,7 +15,7 @@
 
 import torch
 from torch import nn
-from .mlp_function import MLPWithInputSkips2
+from VIPCT.VIPCT.mlp_function import MLPWithInputSkips2
 
 
 def _xavier_init(linear):
@@ -35,6 +35,7 @@ class Decoder(nn.Module):
             average_cams,
             feature_flatten,
             latent_size,
+            ce_bins,
             use_neighbours,
     ):
         """
@@ -125,6 +126,22 @@ class Decoder(nn.Module):
 
             ),
             torch.nn.Linear(512, out_size))
+        elif type == 'FixCTv4_CE':
+
+            self.decoder = nn.Sequential(
+                torch.nn.Linear(latent_size, 2048),
+                torch.nn.ReLU(True),
+                MLPWithInputSkips2(
+                8,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                512,
+                input_skips=(5,),
+
+            ),
+            torch.nn.Linear(512, ce_bins),
+            # torch.nn.Softmax(dim=-1)
+            )
 
         elif type == 'FixCTv4_microphysics':
 
@@ -150,11 +167,12 @@ class Decoder(nn.Module):
         return self.decoder(x)
 
     @classmethod
-    def from_cfg(cls, cfg, latent_size, use_neighbours=False):
+    def from_cfg(cls, cfg, latent_size, ce_bins, use_neighbours=False):
         return cls(
             type = cfg.decoder.name,
             average_cams=cfg.decoder.average_cams,
             feature_flatten=cfg.decoder.feature_flatten,
             latent_size = latent_size,
+            ce_bins=ce_bins,
             use_neighbours = use_neighbours,
         )

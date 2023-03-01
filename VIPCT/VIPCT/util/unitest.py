@@ -15,22 +15,12 @@
 
 import pickle
 import matplotlib.pyplot as plt
-from VIPCT.volumes import Volumes
-
-import math
-import warnings
-from typing import List, Optional, Sequence, Tuple, Union
+from VIPCT.scene.volumes import Volumes
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from VIPCT.util.types import Device
-from VIPCT.util.renderer_utils import TensorProperties, convert_to_tensors_and_broadcast
-from VIPCT.cameras import PerspectiveCameras
-from VIPCT.encoder import Backbone
-import matplotlib.patches as patches
-import matplotlib.backends.backend_pdf
-import matplotlib.cm as cm
+
 # from scipy.interpolate import griddata
 # from scipy import interpolate
 
@@ -159,7 +149,6 @@ if __name__ == "__main__":
         pdf.close()
         print()
     else:
-        from VIPCT.cameras import AirMSPICameras
         import os
         DEFAULT_DATA_ROOT = '/home/roironen/Data'
         data_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train'
@@ -198,8 +187,6 @@ if __name__ == "__main__":
             image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/'
             image_root = [f for f in glob.glob(os.path.join(image_root, "SIMULATED_AIRMSPI_TRAIN*"))]
             image_root = [glob.glob(os.path.join(f, "*856.pkl")) for f in image_root][1][-1]
-        import scipy.io as sio
-
 
         # val_image = torch.tensor(val_images, device=device).float()[None]
         # masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']

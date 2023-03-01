@@ -17,11 +17,12 @@ import os, time
 import warnings
 import hydra
 import numpy as np
-from VIPCT.airmspi_dataset import get_real_world_airmspi_datasets, trivial_collate
+from VIPCT.dataloader.airmspi_dataset import get_real_world_airmspi_datasets, trivial_collate
 from VIPCT.CTnet import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-from VIPCT.cameras import AirMSPICameras
+from  VIPCT.scene.cameras import AirMSPICameras
+from VIPCT.scene.volumes import Volumes
 import scipy.io as sio
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")

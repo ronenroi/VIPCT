@@ -22,9 +22,10 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torchvision
-from .util import nn_util as util
+from VIPCT.VIPCT.util import nn_util as util
 from .roi_align import ROIAlign
 from .MyResNetFPN import resnet_fpn_backbone
+
 class Backbone(nn.Module):
     """
     2D (Spatial/Pixel-aligned/local) image encoder

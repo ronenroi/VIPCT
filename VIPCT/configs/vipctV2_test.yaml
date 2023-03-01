@@ -1,0 +1,21 @@
+hydra:
+  run:
+    dir: ../test_results/${now:%Y-%m-%d}/${now:%H-%M-%S}
+seed: 0
+debug: False
+gpu: 0
+save_results: False
+show: False
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-02-26_VIPCTv2_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_CE_300bins_LR5.0e-05_Gcam_64_Gdomain_64_maskSC/16-46-37/checkpoints/cp_165000.pth'
+data:
+  dataset_name: 'BOMEX_10cameras_20m'
+  n_val: -1
+
+ct_net:
+  val_n_query: 200
+  val_mask_type: 'space_carving' # 'space_carving' 'gt_mask' None
+  query_point_val_method: 'all'
+  pred_type: 'max'
+
+min_mask_points: 0 # 30 for CASS_10cams_50m
+

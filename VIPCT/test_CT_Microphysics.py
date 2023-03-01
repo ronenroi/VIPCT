@@ -22,13 +22,16 @@ import warnings
 import hydra
 import numpy as np
 import torch
-from VIPCT.visualization import SummaryWriter
-from VIPCT.microphysics_dataset import get_cloud_microphysics_datasets, trivial_collate
+from VIPCT.VIPCT.util.visualization import SummaryWriter
+from VIPCT.dataloader.microphysics_dataset import get_cloud_microphysics_datasets, trivial_collate
 from VIPCT.CTnet import *
 from VIPCT.util.stats import Stats
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
+from VIPCT.scene.volumes import Volumes
+from VIPCT.scene.cameras import PerspectiveCameras
+
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")

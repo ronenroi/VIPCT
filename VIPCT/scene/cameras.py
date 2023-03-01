@@ -401,7 +401,8 @@ def _broadcast_bmm(a, b):
 if __name__ == "__main__":
     import pickle
     import matplotlib.pyplot as plt
-    from volumes import Volumes
+    from VIPCT.VIPCT.scene.volumes import Volumes
+
 
     #test camera projection
     def sample_features(latents, uv):

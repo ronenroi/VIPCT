@@ -1,25 +1,12 @@
-import os, glob
+import glob
 
 import pickle
-import matplotlib.pyplot as plt
-from VIPCT.volumes import Volumes
 
 import math
-import warnings
-from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import torch
-import torch.nn.functional as F
-from VIPCT.util.types import Device
-from VIPCT.util.renderer_utils import TensorProperties, convert_to_tensors_and_broadcast
-from VIPCT.cameras import PerspectiveCameras
-from VIPCT.encoder import Backbone
 import matplotlib.patches as patches
-import matplotlib.backends.backend_pdf
 import matplotlib.cm as cm
-from scipy.interpolate import griddata
-from scipy import interpolate
 
 if __name__ == "__main__":
 

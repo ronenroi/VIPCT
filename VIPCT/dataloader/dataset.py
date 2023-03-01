@@ -66,7 +66,7 @@ def get_cloud_datasets(
     if dataset_name not in ALL_DATASETS:
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 
-    if dataset_name == 'CASS_10cameras':
+    if dataset_name == 'CASS_10cameras_20m':
         data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
         image_size = [236, 236]
     elif dataset_name == 'BOMEX_CASS_10cameras_20m':
@@ -170,6 +170,8 @@ class CloudDataset(Dataset):
         with open(cloud_path, 'rb') as f:
             data = pickle.load(f)
         images = data['images']
+        if self.transform:
+            images = self.transform(self.transform)
         mask = None
         if self.mask_type == 'space_carving':
             mask = data['mask']

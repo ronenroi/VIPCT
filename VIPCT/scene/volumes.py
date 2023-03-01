@@ -157,19 +157,16 @@ class Volumes:
             grid_list.append(torch.stack([grid_x.flatten(), grid_y.flatten(), grid_z.flatten()]).T)
         return torch.stack(grid_list)
 
-    def get_query_points(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
+    def get_query_points(self, n_query, method='random', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
 
         query_points = self.get_coord_grid()
         ext = self.extinctions.reshape(self.extinctions.shape[0], -1)
-        # indices = None
         indices = [torch.arange(ext.shape[1], device=self.extinctions.device)]
 
         if masks is not None:
             ext = [e[m.reshape(-1)] if m is not None else e for e, m in zip(ext, masks)]
             query_points = [points[m.reshape(-1),:] if m is not None else points for points, m in zip(query_points, masks)]
             indices = [points[m.reshape(-1)] if m is not None else points for points, m in zip(indices, masks)]
-
-
         if method == 'topk':
             indices = [torch.topk(e, n_query if n_query < e.shape[0] else e.shape[0]).indices for e in ext]
             ##TODO support for clouds with less than n_quary unmasked points
@@ -179,6 +176,16 @@ class Volumes:
             indices = [torch.randperm(e.shape[0])[:n_query if n_query < e.shape[0] else e.shape[0]] for e in ext]
             ext = [vol[index] for vol, index in zip(ext, indices)]
             query_points = [points[index, :] for points, index in zip(query_points, indices)]
+        elif method == 'gt_sc_random':
+            NotImplementedError
+            gt_masks = [e>0 for e in ext]
+            masked_gt_ext = [e[m.reshape(-1)] if m is not None else e for e, m in zip(ext, gt_masks)]
+            gt_n_query = int(n_query * 0.8)
+            fp_n_query = n_query - gt_n_query
+            masked_gt_indices = [torch.randperm(e.shape[0])[:gt_n_query if gt_n_query < e.shape[0] else e.shape[0]] for e in masked_gt_ext]
+            masked_gt_ext = [vol[index] for vol, index in zip(masked_gt_ext, masked_gt_indices)]
+            masked_query_points = [e[m.reshape(-1)] if m is not None else e for e, m in zip(query_points, gt_masks)]
+            mask_gt_query_points = [points[index, :] for points, index in zip(masked_query_points, masked_gt_indices)]
         elif method == 'random_bins':
             ext_points = [torch.hstack((e[...,None],points)) for e, points in zip(ext,query_points)]
             ext_points = [e[torch.argsort(e[:,0])].chunk(5) for e in ext_points]
@@ -191,14 +198,40 @@ class Volumes:
 
         elif method == 'all':
             pass
-            # ext = torch.stack(ext)
-            # query_points = torch.stack(query_points)
-            # ext = list(ext)
-            # indices = None
+        # ext = torch.stack(ext)
+        # query_points = torch.stack(query_points)
+        # ext = list(ext)
+        # indices = None
 
         else:
             NotImplementedError()
         return ext, query_points, indices
+
+    def get_query_points_seq(self, n_query, method='random', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
+        ext = self.extinctions.squeeze(1)
+        query_points = self.get_coord_grid().reshape(*ext.shape,-1)
+        indices = None
+        if method == 'toa_random':
+            masks_toa = [(torch.sum(m,-1)>0) for m in masks]
+            indexxy = []
+            query_points2d = []
+            for m,q in zip(masks_toa,query_points):
+                x, y = torch.meshgrid(torch.arange(m.shape[0]), torch.arange(m.shape[1]))
+                # grid_x.append(x)
+                # grid_y.append(y)
+                indexxy.append(torch.stack((x[m],y[m])).T)
+                query_points2d.append(q[m])
+            indices = [torch.randperm(g.shape[0])[:n_query if n_query < g.shape[0] else g.shape[0]] for g in indexxy]
+            indexxy = [xy[ii] for xy,ii in zip(indexxy,indices)]
+            # masked_gridxy = [xy[m] for xy,m in zip(indexxy,masks_toa)]
+            # indices2D = [torch.arange(ext.shape[1], device=self.extinctions.device)]
+            ext = [vol[index[:,0],index[:,1]].flatten() for vol, index in zip(ext, indexxy)]
+            query_points2d = [q[ii].reshape(-1,3) for q,ii in zip(query_points2d,indices)]
+            # xy_z = [coord.reshape((*m.shape, 3))[torch.sum(m, -1) > 0] for coord, m in zip(query_points, masks)]
+        else:
+            NotImplementedError()
+        return ext, query_points2d, indices
+
 
     def get_query_points_microphysics(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
 

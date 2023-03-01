@@ -12,16 +12,17 @@
 #
 # This source code is licensed under the Apache License 2.0 found in the
 # LICENSE file in the root directory of this source tree.
-from .volumes import Volumes
+from VIPCT.scene.volumes import Volumes
 
-from typing import List, Optional, Tuple
+
+from typing import Tuple
 
 import torch
-from .cameras import PerspectiveCameras, AirMSPICameras
+from VIPCT.scene.cameras import PerspectiveCameras, AirMSPICameras
 
 from .mlp_function import MLPWithInputSkips, MLPIdentity
-from .encoder import Backbone
-from .decoder import Decoder
+from VIPCT.VIPCT.encoder.encoder import Backbone
+from VIPCT.VIPCT.decoder.decoder import Decoder
 
 
 class CTnet(torch.nn.Module):

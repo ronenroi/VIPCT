@@ -13,7 +13,6 @@
 # This source code is licensed under the Apache License 2.0 found in the
 # LICENSE file in the root directory of this source tree.
 
-import collections
 import os, time
 import pickle
 import warnings
@@ -21,16 +20,12 @@ import warnings
 # sys.path.insert(0, '/home/roironen/pytorch3d/projects/')
 import hydra
 import numpy as np
-import torch
-from VIPCT.util.visualization import SummaryWriter
-from dataloder.dataset import get_cloud_datasets, trivial_collate
-from VIPCT.CTnet import *
-from VIPCT.util.stats import Stats
+from VIPCT.VIPCT.CTnet import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-import matplotlib.pyplot as plt
-from VIPCT.cameras import AirMSPICameras
+from VIPCT.scene.cameras import AirMSPICameras
 import scipy.io as sio
+from VIPCT.VIPCT.scene.volumes import Volumes
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 

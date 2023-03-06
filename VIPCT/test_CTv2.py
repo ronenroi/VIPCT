@@ -20,11 +20,11 @@ import hydra
 import numpy as np
 import torch
 from dataloader.dataset import get_cloud_datasets, trivial_collate
-from VIPCT.CTnetV2 import *
+from VIPCT.VIPCT.CTnetV2 import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-from VIPCT.util.plot_util import *
-from VIPCT.util.visualization import SummaryWriter
+from VIPCT.VIPCT.util.plot_util import *
+from VIPCT.VIPCT.util.visualization import SummaryWriter
 import scipy.io as sio
 from losses.test_errors import *
 from losses.losses import *

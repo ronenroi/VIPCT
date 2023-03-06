@@ -23,8 +23,8 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.nn.functional as F
-from .util.types import Device
-from .util.renderer_utils import TensorProperties
+from VIPCT.VIPCT.util.types import Device
+from VIPCT.VIPCT.util.renderer_utils import TensorProperties
 
 
 # Default values for rotation and translation matrices.

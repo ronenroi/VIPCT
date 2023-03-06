@@ -47,7 +47,7 @@ CE = torch.nn.CrossEntropyLoss(reduction='mean')
 #     criterion = criterion.to(device)
 #     return criterion
 
-@hydra.main(config_path=CONFIG_DIR, config_name="vipctV2_train")
+@hydra.main(config_path=CONFIG_DIR, config_name="vipctV2_train_seq")
 def main(cfg: DictConfig):
 
     # Set the relevant seeds for reproducibility.

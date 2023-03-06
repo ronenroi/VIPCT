@@ -195,7 +195,10 @@ class CloudDataset(Dataset):
         else:
             image_sizes = [image.shape for image in images]
         extinction = data['ext']
-        grid = data['grid']
+        grid = data['grid'] #there is an issue with some grids. make sure that the grids starts from (0,0,0)
+        grid[0] -= grid[0][0]
+        grid[1] -= grid[1][0]
+        grid[2] -= grid[2][0]
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
 

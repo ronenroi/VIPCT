@@ -14,8 +14,10 @@ from torch import nn, Tensor
 import pdb
 import torch.nn as nn
 from itertools import repeat
+from VIPCT.VIPCT.mlp_function import MLPWithInputSkips2
 
-
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
 class DecoderEmbeddings(nn.Module):
@@ -40,7 +42,11 @@ class DecoderEmbeddings(nn.Module):
             seq_length, dtype=torch.long, device=device)
         position_ids = position_ids.unsqueeze(0).expand(input_shape)
 
-        input_embeds = self.word_embeddings(x)
+        try:
+            y = x.clone().cpu()
+            input_embeds = self.word_embeddings(x.long())
+        except:
+            print()
         position_embeds = self.position_embeddings(position_ids)
 
         embeddings = input_embeds + position_embeds
@@ -50,24 +56,32 @@ class DecoderEmbeddings(nn.Module):
         return embeddings
 
 
-class Transformer(nn.Module):
+class VipctTransformer(nn.Module):
 
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
                  return_intermediate_dec=False):
         super().__init__()
-        self.embedding = DecoderEmbeddings(2003, d_model, 2000, 501, dropout)
-        encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
-                                                dropout, activation, normalize_before)
-        encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
-        self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+        vocab_size = 301
+        self.embedding = DecoderEmbeddings(vocab_size+1, d_model, None, vocab_size+1, dropout)
+        # encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
+        #                                         dropout, activation, normalize_before)
+        # encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
+        # self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+        self.encoder = MLPWithInputSkips2(
+                    6,
+                    21184,
+                    d_model,
+                    d_model,
+                )
 
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
         decoder_norm = nn.LayerNorm(d_model)
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
                                           return_intermediate=return_intermediate_dec)
+        self.output = nn.Linear(d_model, vocab_size)
 
         self._reset_parameters()
 #        self.token_drop = SpatialDropout(drop=0.5)
@@ -79,23 +93,27 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, mask, query_embed, pos_embed, seq, vocab_embed):
+    def forward(self, src, mask, query_embed, seq, vocab_embed=None):
         # flatten NxCxHxW to HWxNxC
-        bs, c, h, w = src.shape
-        src = src.flatten(2).permute(2, 0, 1)
-        pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
-        mask = mask.flatten(1)
+        # bs, c, h, w = src.shape
+        bs, s, c = src.shape #batch_size, Nz(seq), d_feature
+        # src = src.permute(2, 0, 1)
+        # src = src.flatten(2).permute(2, 0, 1)
+        # pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
+        if mask:
+            mask = mask.flatten(1)
         tgt = self.embedding(seq).permute(1, 0, 2)
 #        tgt = self.token_drop(self.embedding(seq), noise_shape=(bs, 501, 1)).permute(1, 0, 2)
         query_embed = self.embedding.position_embeddings.weight.unsqueeze(1)
         query_embed = query_embed.repeat(1, bs, 1)
-        memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed.half())
-
+        # memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed.half())
+        memory = self.encoder(src).transpose(0, 1)
+        pos_embed = None
         if self.training:
            hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed[:len(tgt)],
-                          tgt_mask=generate_square_subsequent_mask(len(tgt)).to(tgt.device))
-           return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
+                          tgt_mask=generate_square_subsequent_mask(len(tgt)).to(seq.device))
+           return self.output(hs.transpose(0, 1))#, memory.permute(1, 2, 0)#.view(bs, c, h, w)
         else:
            values = []
            cls_pos = [(i + 1) * 5 - 1 for i in range(100)]
@@ -122,6 +140,104 @@ class Transformer(nn.Module):
 #           seq[:, -1] = 2000
            return seq, torch.cat(values, dim=-1)
 
+    @classmethod
+    def from_cfg(cls, cfg, latent_size, ce_bins):
+        return VipctTransformer(
+            d_model=cfg.transformer.hidden_dim,
+            dropout=cfg.transformer.dropout,
+            nhead=cfg.transformer.nheads,
+            dim_feedforward=cfg.transformer.dim_feedforward,
+            num_encoder_layers=cfg.transformer.num_encoder_layers,
+            num_decoder_layers=cfg.transformer.num_decoder_layers,
+            normalize_before=cfg.transformer.normalize_before,
+            return_intermediate_dec=False,
+        )
+
+
+# class Transformer(nn.Module):
+#
+#     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
+#                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
+#                  activation="relu", normalize_before=False,
+#                  return_intermediate_dec=False):
+#         super().__init__()
+#         self.embedding = DecoderEmbeddings(2003, d_model, 2000, 501, dropout)
+#         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
+#                                                 dropout, activation, normalize_before)
+#         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
+#         self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+#
+#         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
+#                                                 dropout, activation, normalize_before)
+#         decoder_norm = nn.LayerNorm(d_model)
+#         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
+#                                           return_intermediate=return_intermediate_dec)
+#
+#         self._reset_parameters()
+# #        self.token_drop = SpatialDropout(drop=0.5)
+#         self.d_model = d_model
+#         self.nhead = nhead
+#
+#     def _reset_parameters(self):
+#         for p in self.parameters():
+#             if p.dim() > 1:
+#                 nn.init.xavier_uniform_(p)
+#
+#     def forward(self, src, mask, query_embed, pos_embed, seq, vocab_embed):
+#         # flatten NxCxHxW to HWxNxC
+#         bs, c, h, w = src.shape
+#         src = src.flatten(2).permute(2, 0, 1)
+#         pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
+#         mask = mask.flatten(1)
+#         tgt = self.embedding(seq).permute(1, 0, 2)
+# #        tgt = self.token_drop(self.embedding(seq), noise_shape=(bs, 501, 1)).permute(1, 0, 2)
+#         query_embed = self.embedding.position_embeddings.weight.unsqueeze(1)
+#         query_embed = query_embed.repeat(1, bs, 1)
+#         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed.half())
+#
+#         if self.training:
+#            hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
+#                           pos=pos_embed, query_pos=query_embed[:len(tgt)],
+#                           tgt_mask=generate_square_subsequent_mask(len(tgt)).to(tgt.device))
+#            return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
+#         else:
+#            values = []
+#            cls_pos = [(i + 1) * 5 - 1 for i in range(100)]
+#            box_pos = [i for i in range(500) if i not in cls_pos]
+#            for i in range(500):
+#
+#                tgt = self.embedding(seq).permute(1, 0, 2)
+#                query_embed = self.embedding.position_embeddings.weight.unsqueeze(1)
+#                query_embed = query_embed.repeat(1, bs, 1)
+#                hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
+#                           pos=pos_embed, query_pos=query_embed[:len(tgt)],
+#                           tgt_mask=generate_square_subsequent_mask(len(tgt)).to(tgt.device))
+#                out = vocab_embed(hs.transpose(1, 2)[-1, :, -1, :])
+#                out = out.softmax(-1)
+#                out = out[:, :1997]
+#                if i in box_pos:
+# #                  pdb.set_trace()
+#                   out = out[:, :1000]
+# #               if i in [0, 1, 2, 3]:
+# #                   out = out[:, :1000]
+#                value, extra_seq = out.topk(dim=-1, k=1)[0], out.topk(dim=-1, k=1)[1]
+#                seq = torch.cat([seq, extra_seq], dim=-1)
+#                values.append(value)
+# #           seq[:, -1] = 2000
+#            return seq, torch.cat(values, dim=-1)
+#
+#     @classmethod
+#     def from_cfg(cls, cfg, latent_size, ce_bins):
+#         return Transformer(
+#             d_model=cfg.transformer.hidden_dim,
+#             dropout=cfg.transformer.dropout,
+#             nhead=cfg.transformer.nheads,
+#             dim_feedforward=cfg.transformer.dim_feedforward,
+#             num_encoder_layers=cfg.transformer.num_encoder_layers,
+#             num_decoder_layers=cfg.transformer.num_decoder_layers,
+#             normalize_before=cfg.transformer.normalize_before,
+#             return_intermediate_dec=True,
+#         )
 
 
 def generate_square_subsequent_mask(sz):
@@ -195,7 +311,7 @@ class TransformerDecoder(nn.Module):
         if self.return_intermediate:
             return torch.stack(intermediate)
 
-        return output.unsqueeze(0)
+        return output#.unsqueeze(0)
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -348,7 +464,7 @@ def _get_clones(module, N):
 
 
 def build_transformer(args):
-    return Transformer(
+    return VipctTransformer(
         d_model=args.hidden_dim,
         dropout=args.dropout,
         nhead=args.nheads,

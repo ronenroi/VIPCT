@@ -11,6 +11,7 @@
 #
 # This source code is licensed under the Apache License 2.0 found in the
 # LICENSE file in the root directory of this source tree.
+
 from VIPCT.scene.volumes import Volumes
 from typing import List, Optional, Tuple
 import torch
@@ -18,8 +19,9 @@ from VIPCT.scene.cameras import PerspectiveCameras, AirMSPICameras
 from VIPCT.VIPCT.mlp_function import MLPWithInputSkips, MLPIdentity
 from VIPCT.VIPCT.encoder.encoder import Backbone
 from VIPCT.VIPCT.decoder.decoder import Decoder
-from .decoder.transformer import Transformer
-
+from .decoder.transformer import VipctTransformer
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 class CTnetV2(torch.nn.Module):
 
@@ -77,8 +79,14 @@ class CTnetV2(torch.nn.Module):
             len_mask = (cfg.ct_net.n_hidden_neurons_xyz+1) * self.num_masked
             self.decoder_input_size += len_mask
 
-        self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.ce_bins, self.use_neighbours)
-
+        if cfg.decoder.type == 'mlp':
+            self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.ce_bins, self.use_neighbours)
+            self.decoder_type = 'mlp'
+        elif cfg.decoder.type == 'transformer':
+            self.decoder = VipctTransformer.from_cfg(cfg, self.decoder_input_size, self.ce_bins)
+            self.decoder_type = 'transformer'
+        else:
+            NotImplementedError()
 
 
     def forward(
@@ -165,8 +173,18 @@ class CTnetV2(torch.nn.Module):
                 # latent = torch.split(latent,n_query)
                 # latent = torch.vstack([torch.cat((lat,embed.expand(lat.shape[0],-1,-1)),-1) for lat, embed in zip(latent, embed_camera_center)])
                 del embed_camera_center
+            if self.decoder_type == 'mlp':
+                output = self.decoder(latent)
+            elif self.decoder_type == 'transformer':
+                latent = latent.reshape(int(n_query[0]/32),32,-1)
+                seq = volume[0].reshape(int(n_query[0]/32),32)
+                seq = torch.round(seq)
+                seq[seq>300] =300
+                seq_padded = torch.ones_like(seq) * 301 #0-300 cloud values, 301 is bos
+                seq_padded[:, 1:] = seq[:, :-1]
+                output = self.decoder(latent,None,None,seq_padded,None)
+                output = output.reshape(-1,output.shape[-1])
 
-            output = self.decoder(latent)
             output = torch.split(output, n_query)
             out = {"output": output, "volume": volume}
         else:

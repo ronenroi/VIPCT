@@ -20,7 +20,7 @@
 
 import copy
 import torch
-from .util.types import Device, make_device
+from VIPCT.VIPCT.util.types import Device, make_device
 from typing import List, Sequence, Tuple, Union
 
 _TensorBatch = Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor]]

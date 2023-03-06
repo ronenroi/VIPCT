@@ -20,42 +20,46 @@ from VIPCT.scene.volumes import Volumes
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from VIPCT.scene.volumes import Volumes
+from VIPCT.scene.cameras import PerspectiveCameras
+from VIPCT.VIPCT.encoder.encoder import Backbone
 # from scipy.interpolate import griddata
 # from scipy import interpolate
 
 if __name__ == "__main__":
-    if False:
-        def sample_features(latents, uv):
-            """
-            Get pixel-aligned image features at 2D image coordinates
-            :param latent (B, C, H, W) images features
-            :param uv (B, N, 2) image points (x,y)
-            :param image_size image size, either (width, height) or single int.
-            if not specified, assumes coords are in [-1, 1]
-            :return (B, C, N) L is latent size
-            """
-            uv = uv.unsqueeze(2)  # (B, N, 1, 2)
-            samples = torch.empty(0, device=uv.device)
-            for latent in latents:
-                samples = torch.cat((samples, torch.squeeze(F.grid_sample(
-                    latent,
-                    uv,
-                    align_corners=True,
-                    mode='bilinear',
-                    padding_mode='zeros',
-                ))), dim=1)
-            return samples  # (Cams,cum_channels, N)
+    if True:
+        # def sample_features(latents, uv):
+        #     """
+        #     Get pixel-aligned image features at 2D image coordinates
+        #     :param latent (B, C, H, W) images features
+        #     :param uv (B, N, 2) image points (x,y)
+        #     :param image_size image size, either (width, height) or single int.
+        #     if not specified, assumes coords are in [-1, 1]
+        #     :return (B, C, N) L is latent size
+        #     """
+        #     uv = uv.unsqueeze(2)  # (B, N, 1, 2)
+        #     samples = torch.empty(0, device=uv.device)
+        #     for latent in latents:
+        #         samples = torch.cat((samples, torch.squeeze(F.grid_sample(
+        #             latent,
+        #             uv,
+        #             align_corners=True,
+        #             mode='bilinear',
+        #             padding_mode='zeros',
+        #         ))), dim=1)
+        #     return samples  # (Cams,cum_channels, N)
 
 
         # with open('/media/roironen/8AAE21F5AE21DB09/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/32cameras/train/cloud_results_0.pkl', 'rb') as outfile:
-        with open('/media/roironen/8AAE21F5AE21DB09/Data/CUBE.pkl', 'rb') as outfile:
+        # with open('/media/roironen/8AAE21F5AE21DB09/Data/CUBE.pkl', 'rb') as outfile:
+        # with open('/wdata/roironen/Data/CASS_50m_256x256x139_600CCN/10cameras_20m/train/cloud_results_5555.pkl', 'rb') as outfile:
+        with open('/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras_50m/train/cloud_results_999.pkl', 'rb') as outfile:
             x = pickle.load(outfile)
         image_sizes = np.array([image.shape for image in x['images']])
         cameras = PerspectiveCameras(image_size=image_sizes[None], P=torch.tensor(x['cameras_P'],device='cuda').float(),
                                       device='cuda')
-        grid = torch.tensor(x['net_grid'],device='cuda')
-        grid = torch.tensor(x['grid'],device='cuda')
+        # grid = torch.tensor(x['net_grid'],device='cuda')
+        # grid = torch.tensor(x['grid'],device='cuda')
 
         extinction = x['ext'][None,None]
         mask = x['mask'][None]
@@ -64,7 +68,10 @@ if __name__ == "__main__":
         layers = 4
         # images = [torch.arange(int(128/(i+1))**2).reshape(1,1,int(128/(i+1)),-1).double().repeat(image_sizes.shape[0],1,1,1) for i in range(layers)]
         images = x['images']
-        volume = Volumes(torch.tensor(extinction, device='cuda').float(), grid)
+        grid2 = x['grid']
+        # grid2[:-1] += 0.025
+        # grid2[-1] += 0.02
+        volume = Volumes(torch.tensor(extinction, device='cuda').float(), grid2)
 
         backbone = Backbone(backbone='resnet50_fpn',
                 pretrained=False,
@@ -81,12 +88,12 @@ if __name__ == "__main__":
                 n_sampling_nets=1,
                 to_flatten = False,
                 modify_first_layer=True).to('cuda')
-        volume, query_points, _ = volume.get_query_points(1000, 'topk', masks=mask)
+        volume, query_points, _ = volume.get_query_points(2000, 'topk', masks=mask)
         uv = cameras.project_points(query_points, screen=True)
-        uv_swap= torch.zeros(uv[0].shape,device='cuda')
-        uv_swap[..., 0] = uv[0][..., 1]
-        uv_swap[..., 1] = uv[0][..., 0]
-        uv_swap = [uv_swap]
+        # uv_swap= torch.zeros(uv[0].shape,device='cuda')
+        # uv_swap[..., 0] = uv[0][..., 1]
+        # uv_swap[..., 1] = uv[0][..., 0]
+        # uv_swap = [uv_swap]
 
         boxes = [backbone.make_boxes(box_center).reshape(*box_center.shape[:2],-1) for box_center in uv]
         samples = backbone.sample_roi_debug([torch.tensor(images,device='cuda').unsqueeze(1).unsqueeze(1)],uv)
@@ -94,12 +101,25 @@ if __name__ == "__main__":
         # print(torch.tensor(x['ext']).reshape(-1)[indices])
         # grid = x['grid']
         # volume = Volumes(torch.tensor(x['ext'])[None, None].double(), grid)
-        samples[0] = samples[0].reshape(32,1000,10,10)
-        i=0
-        N=2
-        pdf = matplotlib.backends.backend_pdf.PdfPages("output.pdf")
-        ind = np.random.permutation(1000)[:N]
+        samples[0] = samples[0].reshape(10,2000,10,10)
+        N=2000
+        # pdf = matplotlib.backends.backend_pdf.PdfPages("output.pdf")
+        ind = np.random.permutation(2000)[:N]
         ind[0] = 0
+        i=0
+        for im, center in zip(images, uv[0]):
+            fig, ax = plt.subplots(1)
+
+            plt.imshow(im / np.max(im))
+            plt.scatter(center[ind, 0].cpu().numpy(), center[ind, 1].cpu().numpy(), s=1, c='red',
+                        marker='x')
+            plt.title(i)
+            i += 1
+            plt.show()
+
+
+
+
         for im, box, center in zip(images, boxes[0], uv[0]):
             fig, ax = plt.subplots(1)
             colors = cm.YlOrBr(np.linspace(0, 1, N))
@@ -133,25 +153,26 @@ if __name__ == "__main__":
                 ax.add_patch(rect)
             plt.title(i)
             i += 1
-            # plt.show()
-            pdf.savefig(fig)
-        pdf.close()
+            plt.show()
+        #     pdf.savefig(fig)
+        # pdf.close()
         samples = samples[0][:,ind]
-        pdf = matplotlib.backends.backend_pdf.PdfPages("output1.pdf")
+        # pdf = matplotlib.backends.backend_pdf.PdfPages("output1.pdf")
 
-        fig, axs = plt.subplots(32,N)
+        fig, axs = plt.subplots(10,N)
         for im, sample, axx in zip(images, samples, axs):
             for i, ax in enumerate(axx):
                 ax.imshow(sample.cpu().numpy()[i] / np.max(im))
                 ax.axis('off')
         plt.show()
-        pdf.savefig(fig)
-        pdf.close()
+        # pdf.savefig(fig)
+        # pdf.close()
         print()
     else:
         import os
         DEFAULT_DATA_ROOT = '/home/roironen/Data'
         data_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train'
+        data_root = '/wdata/roironen/Data/CASS_50m_256x256x139_600CCN/10cameras_20m/train'
         if False:
 
             image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC/satellites_images_856.pkl'

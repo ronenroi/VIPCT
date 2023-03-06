@@ -17,20 +17,20 @@ import torch
 
 # error criteria
 def relative_error(ext_est, ext_gt, eps=1e-6):
-    assert len(ext_est.shape)==3
-    assert len(ext_gt.shape)==3
+    assert len(ext_est.shape)<=3
+    assert len(ext_gt.shape)<=3
     rel_error = torch.norm(ext_est.view(-1) - ext_gt.view(-1), p=1) / (torch.norm(ext_gt.view(-1), p=1) + eps)
     return rel_error
 
 def relative_squared_error(ext_est, ext_gt, eps=1e-6):
-    assert len(ext_est.shape)==3
-    assert len(ext_gt.shape)==3
+    assert len(ext_est.shape)<=3
+    assert len(ext_gt.shape)<=3
     rel_squared_error = torch.sum((ext_est.view(-1) - ext_gt.view(-1)) ** 2) / (torch.sum((ext_gt.view(-1)) ** 2) + eps)
     return rel_squared_error
 
 def relative_mass_error(ext_est, ext_gt, eps=1e-6):
-    assert len(ext_est.shape)==3
-    assert len(ext_gt.shape)==3
+    assert len(ext_est.shape)<=3
+    assert len(ext_gt.shape)<=3
     rel_mass_error = (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
     return rel_mass_error
 

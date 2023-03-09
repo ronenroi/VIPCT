@@ -49,6 +49,7 @@ class CTnetV2(torch.nn.Module):
         self.val_mask_type = None if cfg.ct_net.val_mask_type == 'None' else cfg.ct_net.val_mask_type
         self.decoder_input_size = self._image_encoder.latent_size* n_cam
         self.ce_bins = cfg.cross_entropy.bins
+        self.iter = 0
         if n_layers_xyz>0:
             if n_layers_xyz>1:
                 self.mlp_xyz = MLPWithInputSkips(
@@ -85,9 +86,83 @@ class CTnetV2(torch.nn.Module):
         elif cfg.decoder.type == 'transformer':
             self.decoder = VipctTransformer.from_cfg(cfg, self.decoder_input_size, self.ce_bins)
             self.decoder_type = 'transformer'
+            self.training_seq_iter = cfg.transformer.training_seq_iter
         else:
             NotImplementedError()
 
+    def forward_test(self, image_features, embed_camera_center, query_points, uv, n_query):
+        if self.decoder_type == 'mlp':
+            return self.forward_test_mlp(image_features, embed_camera_center, query_points, uv, n_query)
+        elif self.decoder_type == 'transformer':
+            return self.forward_test_transformer(image_features, embed_camera_center, query_points, uv, n_query)
+        else:
+            NotImplementedError()
+
+    def forward_test_mlp(self, image_features, embed_camera_center, query_points, uv, n_query):
+        assert self.decoder_type == 'mlp'
+        n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / self.val_n_query))
+        uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
+        query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
+        output = [torch.empty(0, device=image_features[0].device)] * len(n_query)
+        for chunk in range(n_chunk):
+            uv_chunk = [p[chunk] for p in uv]
+            n_split = [points.shape[1] for points in uv_chunk]
+            latent_chunk = self._image_encoder.sample_roi(image_features, uv_chunk)
+            latent_chunk = torch.vstack(latent_chunk).transpose(0, 1)
+            latent_chunk = latent_chunk.reshape(latent_chunk.shape[0], -1)
+            if query_points is not None:
+                query_points_chunk = query_points[chunk]
+                # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
+                latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
+                del query_points_chunk
+            if embed_camera_center is not None:
+                embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
+                                                                                    latent_chunk.shape[0],
+                                                                                    -1, -1)
+                embed_camera_center_chunk = embed_camera_center_chunk.reshape(latent_chunk.shape[0], -1)
+                latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
+
+            output_chunk = self.decoder(latent_chunk)
+            output_chunk = torch.split(output_chunk, n_split)
+            output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
+        return output
+
+    def forward_test_transformer(self, image_features, embed_camera_center, query_points, uv, n_query, z_size=32):
+        assert self.decoder_type == 'transformer'
+        n_query_z = int(torch.tensor(n_query).sum() / z_size)
+        query_points = query_points.reshape(n_query_z,z_size,-1)
+        uv = [p.reshape(-1,n_query_z,z_size,2) for p in uv]
+        n_chunk = int(torch.ceil(torch.tensor(n_query_z / self.val_n_query)))
+        uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
+        query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
+        output = [torch.empty(0, device=image_features[0].device)] * len(n_query)
+        for chunk in range(n_chunk):
+            uv_chunk = [p[chunk].reshape(p[chunk].shape[0],-1,2) for p in uv]
+            n_split = [points.shape[1] for points in uv_chunk]
+            latent_chunk = self._image_encoder.sample_roi(image_features, uv_chunk)
+            latent_chunk = torch.vstack(latent_chunk).transpose(0, 1)
+            latent_chunk = latent_chunk.reshape(latent_chunk.shape[0], -1)
+            if query_points is not None:
+                query_points_chunk = query_points[chunk].reshape(-1,query_points[chunk].shape[-1])
+                # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
+                latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
+                del query_points_chunk
+            if embed_camera_center is not None:
+                embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
+                                                                                    latent_chunk.shape[0],
+                                                                                    -1, -1)
+                embed_camera_center_chunk = embed_camera_center_chunk.reshape(latent_chunk.shape[0], -1)
+                latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
+
+
+            latent_chunk = latent_chunk.reshape(int(latent_chunk.shape[0] / z_size), z_size, -1)
+            seq_padded = torch.ones((latent_chunk.shape[0],1),device=latent_chunk.device) * 301  # 301 is bos
+            output_chunk = self.decoder(latent_chunk, None, None, seq_padded, None) # Nchunk, Nz, bins(301)
+            # output_chunk = torch.split(output_chunk, n_split)
+            output = [torch.cat([output[0], output_chunk], dim=0)]
+
+            # output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
+        return output
 
     def forward(
         self,
@@ -124,8 +199,7 @@ class CTnetV2(torch.nn.Module):
                 volume, query_points, _ = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
         else:
             if self.query_point_method == 'toa_random':
-                volume, query_points, query_indices = volume.get_query_points_seq(self.n_query, self.query_point_method,
-                                                                      masks=masks)
+                volume, query_points, query_indices = volume.get_query_points_seq(self.n_query, self.query_point_val_method,                                                                   masks=masks)
             else:
                 volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
         n_query = [points.shape[0] for points in query_points]
@@ -177,42 +251,26 @@ class CTnetV2(torch.nn.Module):
                 output = self.decoder(latent)
             elif self.decoder_type == 'transformer':
                 latent = latent.reshape(int(n_query[0]/32),32,-1)
-                seq = volume[0].reshape(int(n_query[0]/32),32)
-                seq = torch.round(seq)
-                seq[seq>300] =300
-                seq_padded = torch.ones_like(seq) * 301 #0-300 cloud values, 301 is bos
-                seq_padded[:, 1:] = seq[:, :-1]
-                output = self.decoder(latent,None,None,seq_padded,None)
+                if self.training_seq_iter<self.iter:
+                    seq = volume[0].reshape(int(n_query[0]/32),32)
+                    seq = torch.round(seq)
+                    seq[seq>300] =300
+                    seq_padded = torch.ones_like(seq) * 301 #0-300 cloud values, 301 is bos
+                    seq_padded[:, 1:] = seq[:, :-1]
+                    output = self.decoder(latent,None,None,seq_padded,None)
+                else:
+                    seq_padded = torch.ones((latent.shape[0], 1), device=latent.device) * 301  # 301 is bos
+                    output = self.decoder(latent,None,None,seq_padded,None,training_seq=True)
+
                 output = output.reshape(-1,output.shape[-1])
 
             output = torch.split(output, n_query)
             out = {"output": output, "volume": volume}
         else:
-            n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / self.val_n_query))
-            uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
-            query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
-            output = [torch.empty(0,device=image_features[0].device)] * len(n_query)
-            for chunk in range(n_chunk):
-                uv_chunk = [p[chunk] for p in uv]
-                n_split = [points.shape[1] for points in uv_chunk]
-                latent_chunk = self._image_encoder.sample_roi(image_features, uv_chunk)
-                latent_chunk = torch.vstack(latent_chunk).transpose(0, 1)
-                latent_chunk = latent_chunk.reshape(latent_chunk.shape[0],-1)
-                if query_points is not None:
-                    assert Vbatch == 1
-                    query_points_chunk = query_points[chunk]
-                    # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
-                    latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
-                    del query_points_chunk
-                if embed_camera_center is not None:
-                    assert Vbatch == 1
-                    embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1, int(latent_chunk.shape[0] / Vbatch), -1, -1)
-                    embed_camera_center_chunk = embed_camera_center_chunk.reshape(int(latent_chunk.shape[0] / Vbatch),-1)
-                    latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
-
-                output_chunk = self.decoder(latent_chunk)
-                output_chunk = torch.split(output_chunk, n_split)
-                output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
+            assert Vbatch == 1
+            output = self.forward_test(image_features, embed_camera_center, query_points, uv, n_query)
 
             out = {"output": output, "volume": volume, 'query_indices': query_indices}
         return out
+
+

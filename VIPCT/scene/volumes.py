@@ -211,16 +211,16 @@ class Volumes:
         ext = self.extinctions.squeeze(1)
         query_points = self.get_coord_grid().reshape(*ext.shape,-1)
         indices = None
+        masks_toa = [(torch.sum(m, -1) > 0) for m in masks]
+        indexxy = []
+        query_points2d = []
+        for m, q in zip(masks_toa, query_points):
+            x, y = torch.meshgrid(torch.arange(m.shape[0]), torch.arange(m.shape[1]))
+            # grid_x.append(x)
+            # grid_y.append(y)
+            indexxy.append(torch.stack((x[m], y[m])).T)
+            query_points2d.append(q[m])
         if method == 'toa_random':
-            masks_toa = [(torch.sum(m,-1)>0) for m in masks]
-            indexxy = []
-            query_points2d = []
-            for m,q in zip(masks_toa,query_points):
-                x, y = torch.meshgrid(torch.arange(m.shape[0]), torch.arange(m.shape[1]))
-                # grid_x.append(x)
-                # grid_y.append(y)
-                indexxy.append(torch.stack((x[m],y[m])).T)
-                query_points2d.append(q[m])
             indices = [torch.randperm(g.shape[0])[:n_query if n_query < g.shape[0] else g.shape[0]] for g in indexxy]
             indexxy = [xy[ii] for xy,ii in zip(indexxy,indices)]
             # masked_gridxy = [xy[m] for xy,m in zip(indexxy,masks_toa)]
@@ -228,9 +228,13 @@ class Volumes:
             ext = [vol[index[:,0],index[:,1]].flatten() for vol, index in zip(ext, indexxy)]
             query_points2d = [q[ii].reshape(-1,3) for q,ii in zip(query_points2d,indices)]
             # xy_z = [coord.reshape((*m.shape, 3))[torch.sum(m, -1) > 0] for coord, m in zip(query_points, masks)]
+        elif method == 'toa_all':
+            ext = [vol[index[:, 0], index[:, 1]].flatten() for vol, index in zip(ext, indexxy)]
+            query_points2d = [q.reshape(-1,3) for q in query_points2d]
+
         else:
             NotImplementedError()
-        return ext, query_points2d, indices
+        return ext, query_points2d, indexxy
 
 
     def get_query_points_microphysics(self, n_query, method='topk', masks=None) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:

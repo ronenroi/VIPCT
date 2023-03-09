@@ -150,7 +150,8 @@ def get_cloud_datasets(
 
 
 class CloudDataset(Dataset):
-    def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name=''):
+    def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name='',
+                 fix_grid=False):
         self.cloud_dir = cloud_dir
         self.transform = transform
         self.target_transform = target_transform
@@ -160,6 +161,7 @@ class CloudDataset(Dataset):
         self.mean = mean
         self.std = std
         self.dataset_name = dataset_name
+        self.fix_grid = fix_grid
 
     def __len__(self):
         return len(self.cloud_dir)
@@ -196,9 +198,10 @@ class CloudDataset(Dataset):
             image_sizes = [image.shape for image in images]
         extinction = data['ext']
         grid = data['grid'] #there is an issue with some grids. make sure that the grids starts from (0,0,0)
-        grid[0] -= grid[0][0]
-        grid[1] -= grid[1][0]
-        grid[2] -= grid[2][0]
+        if self.fix_grid:
+            grid[0] -= grid[0][0]
+            grid[1] -= grid[1][0]
+            grid[2] -= grid[2][0]
         camera_center = data['cameras_pos'][cam_i]
         projection_matrix = data['cameras_P'][cam_i]
 

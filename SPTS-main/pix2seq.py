@@ -579,7 +579,7 @@ def train_eval(model,
                                  lr_scheduler if step == 'batch' else None,
                                  criterion, logger=logger)
 
-        valid_loss = valid_epoch(model, valid_loader, criterion)
+        valid_loss = valid_epoch(model, train_loader, criterion)
         print(f"Valid loss: {valid_loss:.3f}")
 
         if step == 'epoch':
@@ -666,3 +666,27 @@ train_eval(model,
            lr_scheduler=lr_scheduler,
            step='batch',
            logger=None)
+
+
+def generate(model, x, tokenizer, max_len=50, top_k=0, top_p=1):
+    x = x.to(CFG.device)
+    batch_preds = torch.ones(x.size(0), 1).fill_(tokenizer.BOS_code).long().to(CFG.device)
+    confs = []
+
+    if top_k != 0 or top_p != 1:
+        sample = lambda preds: torch.softmax(preds, dim=-1).multinomial(num_samples=1).view(-1, 1)
+    else:
+        sample = lambda preds: torch.softmax(preds, dim=-1).argmax(dim=-1).view(-1, 1)
+
+    with torch.no_grad():
+        for i in range(max_len):
+            preds = model.predict(x, batch_preds)
+            ## If top_k and top_p are set to default, the following line does nothing!
+            preds = top_k_top_p_filtering(preds, top_k=top_k, top_p=top_p)
+            if i % 4 == 0:
+                confs_ = torch.softmax(preds, dim=-1).sort(axis=-1, descending=True)[0][:, 0].cpu()
+                confs.append(confs_)
+            preds = sample(preds)
+            batch_preds = torch.cat([batch_preds, preds], dim=1)
+
+    return batch_preds.cpu(), confs

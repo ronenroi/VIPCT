@@ -37,7 +37,7 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
         if pred_type == 'max':
             i_max = discrete_pred.argmax(-1)
             scores = torch.exp(discrete_pred)
-            max_score = scores.gather(1,i_max[...,None]).squeeze()
+            max_score = scores.gather(-1,i_max[...,None]).squeeze()
             confidence = max_score / scores.sum(-1)
             delta = (max - min) / (bins - 1)
             pred = i_max * delta + min

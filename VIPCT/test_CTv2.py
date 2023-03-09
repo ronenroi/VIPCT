@@ -159,14 +159,27 @@ def main(cfg: DictConfig):
                                 conf_vol[i][m] = out_vol[:, 1]
                 else:
                     for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
-                        if len(out_vol.shape)==1:
-                            est_vol[m] = out_vol.reshape(-1)
+                        if m.shape[-1] == 2:  # sequential querying
+                            est_vol = est_vol.reshape(val_volume.extinctions.shape[2:])
                             conf_vol = torch.ones_like(est_vol) * torch.nan
-                            conf_vol[m] = val_out["output_conf"][0]
-                        else: # value, std
-                            est_vol[m] = out_vol[:,0]
-                            conf_vol = torch.ones_like(est_vol) * torch.nan
-                            conf_vol[m] = out_vol[:, 1]
+                            for col_i in range(m.shape[0]):
+                                est_vol[m[col_i, 0], m[col_i, 1], :] = out_vol[col_i]
+                                conf_vol[m[col_i, 0], m[col_i, 1], :] = val_out["output_conf"][0][col_i]
+                            mask = masks[0].to(device=est_vol.device)
+                            est_vol *= mask
+                            conf_vol *= mask
+
+                        else:
+                            if len(out_vol.shape)==1:
+                                est_vol[m] = out_vol.reshape(-1)
+                                conf_vol = torch.ones_like(est_vol) * torch.nan
+                                conf_vol[m] = val_out["output_conf"][0]
+                            else: # value, std
+                                #not supported anymore
+                                assert False
+                                est_vol[m] = out_vol[:,0]
+                                conf_vol = torch.ones_like(est_vol) * torch.nan
+                                conf_vol[m] = out_vol[:, 1]
                 time_net = time.time() - net_start_time
             else:
                 time_net = 0
@@ -180,7 +193,21 @@ def main(cfg: DictConfig):
             est_vols[est_vols<0] = 0
 
             print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, L2 = {relative_squared_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
-
+            if False:
+                xv, yv, zv = np.meshgrid(np.linspace(0, gt_vol.shape[0],
+                                                     gt_vol.shape[0]),np.linspace(0, gt_vol.shape[1], gt_vol.shape[1]),
+                                         np.linspace(0, gt_vol.shape[2], gt_vol.shape[2]))
+                plt.scatter(gt_vol[masks[0]].ravel().cpu(), est_vols[masks[0]].ravel().cpu(),c=zv[masks[0]].ravel())
+                plt.colorbar()
+                plt.plot([0,gt_vol[masks[0]].ravel().cpu().max()],[0,gt_vol[masks[0]].ravel().cpu().max()],'r')
+                plt.xlabel('gt')
+                plt.ylabel('est')
+                plt.axis('square')
+                plt.show()
+                plt.scatter(torch.abs(gt_vol.ravel().cpu() - est_vols.ravel().cpu()), conf_vol.ravel().cpu())
+                plt.xlabel('|gt-est|')
+                plt.ylabel('confidence')
+                plt.show()
             if cfg.save_results:
                 val_image *= cfg.data.std
                 val_image += cfg.data.mean
@@ -189,7 +216,6 @@ def main(cfg: DictConfig):
             # aggregate error statistics
             relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             l2_err.append(relative_squared_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
-            relative_mass_err.append(relative_mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             relative_mass_err.append(relative_mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             confidence_list.append(conf_vol.cpu().numpy())
             est_list.append(est_vols.cpu().numpy())

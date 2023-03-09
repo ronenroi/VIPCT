@@ -126,15 +126,15 @@ def main(cfg: DictConfig):
 
     # Following the original code, we use exponential decay of the
     # learning rate: current_lr = base_lr * gamma ** (epoch / step_size)
-    def lr_lambda(epoch):
-        return cfg.optimizer.lr_scheduler_gamma ** (
-            epoch #/ cfg.optimizer.lr_scheduler_step_size
-        )
+    # def lr_lambda(epoch):
+    #     return cfg.optimizer.lr_scheduler_gamma ** (
+    #         epoch #/ cfg.optimizer.lr_scheduler_step_size
+    #     )
 
     # The learning rate scheduling is implemented with LambdaLR PyTorch scheduler.
-    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda, last_epoch=start_epoch - 1, verbose=False
-    )
+    # lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+    #     optimizer, lr_lambda, last_epoch=start_epoch - 1, verbose=False
+    # )
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
@@ -174,10 +174,10 @@ def main(cfg: DictConfig):
             # lr_scheduler(None)
             if iteration % (cfg.stats_print_interval) == 0 and iteration > 0:
                 stats.new_epoch()  # Init a new epoch.
-            if iteration in cfg.optimizer.iter_steps:
-                # Adjust the learning rate.
-                lr_scheduler.step()
-
+            # if iteration in cfg.optimizer.iter_steps:
+            #     # Adjust the learning rate.
+            #     lr_scheduler.step()
+            model.iter = iteration
             images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
 
             images = torch.tensor(np.array(images), device=device).float()
@@ -245,7 +245,7 @@ def main(cfg: DictConfig):
 
             # Update stats with the current metrics.
             stats.update(
-                {"loss": float(loss), "relative_error": float(relative_err), "lr":  lr_scheduler.get_last_lr()[0],#optimizer.param_groups[0]['lr'],#lr_scheduler.get_last_lr()[0]
+                {"loss": float(loss), "relative_error": float(relative_err), "lr":  optimizer.param_groups[0]['lr'],#optimizer.param_groups[0]['lr'],#lr_scheduler.get_last_lr()[0]
                  "max_memory": float(round(torch.cuda.max_memory_allocated()/1e6))},
                 stat_set="train",
             )
@@ -302,7 +302,13 @@ def main(cfg: DictConfig):
                                 est_vols[i][m.squeeze(0)] = out_vol.squeeze(1)
                         else:
                             for est_vol, out_vol, m in zip(est_vols, val_out["output"], val_out['query_indices']):
-                                est_vol.reshape(-1)[m] = out_vol.reshape(-1)  # .reshape(m.shape)[m]
+                                if m.shape[-1]==2: #sequential querying
+                                    for col_i in range(m.shape[0]):
+                                        est_vol[m[col_i,0],m[col_i,1],:] = out_vol[col_i]
+                                    mask = masks[0].to(device=est_vol.device)
+                                    est_vol *= mask
+                                else:
+                                    est_vol.reshape(-1)[m] = out_vol.reshape(-1)  # .reshape(m.shape)[m]
                         assert len(est_vols)==1 ##TODO support validation with batch larger than 1
                         gt_vol = val_volume.extinctions[0].squeeze()
                         est_vols = est_vols.squeeze()
@@ -326,12 +332,13 @@ def main(cfg: DictConfig):
                             writer._dataset = 'val'  # .format(val_i)
                             if val_i in val_scatter_ind:
                                 writer.monitor_scatter_plot(est_vols, gt_vol,ind=val_i)
-                    # Update stats with the validation metrics.
-                    stats.update({"loss": float(loss_val), "relative_error": float(relative_err)}, stat_set="val")
+
 
                 loss_val /= (val_i + 1)
                 relative_err /= (val_i + 1)
                 relative_mass_err /= (val_i+1)
+                # Update stats with the validation metrics.
+                stats.update({"loss": float(loss_val), "relative_error": float(relative_err)}, stat_set="val")
 
                 if writer:
                     writer._iter = iteration

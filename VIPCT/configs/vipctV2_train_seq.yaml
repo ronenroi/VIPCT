@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_CE_LR5e-05_SEQ_resume_training_seq/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_CE_LR3e-06_SEQ_resume_training_seq/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 0
 debug: False
@@ -23,7 +23,7 @@ augmentation:
   std: 0.05
 optimizer:
   max_epochs: 100000
-  lr: 5.0e-05
+  lr: 3.0e-06 #5.0e-05
   wd: 1.0e-05
   batch_size: 1
   iter_steps: [1000000000]
@@ -41,7 +41,7 @@ ct_net:
   n_layers_dir: 4
   append_xyz: [2]
   append_dir: [2]
-  n_query: 20
+  n_query: 40
   val_n_query: 20
   stop_encoder_grad: False
   mask_type: 'space_carving'  #'space_carving' 'gt_mask' None

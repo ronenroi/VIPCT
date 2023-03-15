@@ -112,9 +112,9 @@ def main(cfg: DictConfig):
     )
 
     # Load the optimizer state dict in case we are resuming.
-    if optimizer_state_dict is not None:
-        optimizer.load_state_dict(optimizer_state_dict)
-        optimizer.last_epoch = start_epoch
+    # if optimizer_state_dict is not None:
+    #     optimizer.load_state_dict(optimizer_state_dict)
+    #     optimizer.last_epoch = start_epoch
 
     # Init the stats object.
     if stats is None:

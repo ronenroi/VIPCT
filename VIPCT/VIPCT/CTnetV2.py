@@ -193,7 +193,7 @@ class CTnetV2(torch.nn.Module):
         if self.training:
             if self.use_neighbours:
                 volume, query_points, _ = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
-            elif self.query_point_method== 'toa_random':
+            elif self.query_point_method == 'toa_random' or self.query_point_method == 'toa_all':
                 volume, query_points, _ = volume.get_query_points_seq(self.n_query, self.query_point_method, masks=masks)
             else:
                 volume, query_points, _ = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)

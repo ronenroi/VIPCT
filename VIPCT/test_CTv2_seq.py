@@ -34,7 +34,7 @@ from VIPCT.scene.cameras import PerspectiveCameras
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
-@hydra.main(config_path=CONFIG_DIR, config_name="vipctV2_test")
+@hydra.main(config_path=CONFIG_DIR, config_name="vipctV2_test_seq")
 def main(cfg: DictConfig):
 
     # Set the relevant seeds for reproducibility
@@ -138,8 +138,7 @@ def main(cfg: DictConfig):
                 )
                 if cfg.optimizer.loss == 'CE':
                     val_out["output"], val_out["output_conf"] = get_pred_and_conf_from_discrete(val_out["output"], cfg.cross_entropy.min,
-                                                               cfg.cross_entropy.max, cfg.cross_entropy.bins, pred_type=cfg.ct_net.pred_type,
-                                                                                                conf_type=cfg.ct_net.conf_type)
+                                                               cfg.cross_entropy.max, cfg.cross_entropy.bins, pred_type=cfg.ct_net.pred_type)
 
                 if val_out['query_indices'] is None:
                     for i, (out_vol, m) in enumerate(zip(val_out["output"],masks)):
@@ -198,14 +197,14 @@ def main(cfg: DictConfig):
                 xv, yv, zv = np.meshgrid(np.linspace(0, gt_vol.shape[0],
                                                      gt_vol.shape[0]),np.linspace(0, gt_vol.shape[1], gt_vol.shape[1]),
                                          np.linspace(0, gt_vol.shape[2], gt_vol.shape[2]))
-                plt.scatter(gt_vol[est_vols>1].ravel().cpu(), est_vols[est_vols>1].ravel().cpu(),c=conf_vol[est_vols>1].ravel().cpu())
+                plt.scatter(gt_vol[masks[0]].ravel().cpu(), est_vols[masks[0]].ravel().cpu(),c=zv[masks[0]].ravel())
                 plt.colorbar()
-                plt.plot([0,gt_vol[est_vols>1].ravel().cpu().max()],[0,gt_vol[est_vols>1].ravel().cpu().max()],'r')
+                plt.plot([0,gt_vol[masks[0]].ravel().cpu().max()],[0,gt_vol[masks[0]].ravel().cpu().max()],'r')
                 plt.xlabel('gt')
                 plt.ylabel('est')
                 plt.axis('square')
                 plt.show()
-                plt.scatter(torch.abs(gt_vol[est_vols>1].ravel().cpu() - est_vols[est_vols>1].ravel().cpu()), conf_vol[est_vols>1].ravel().cpu())
+                plt.scatter(torch.abs(gt_vol.ravel().cpu() - est_vols.ravel().cpu()), conf_vol.ravel().cpu())
                 plt.xlabel('|gt-est|')
                 plt.ylabel('confidence')
                 plt.show()

@@ -10,7 +10,9 @@ checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-02-26_VIPCTv2
 data:
 #  dataset_name: 'BOMEX_50CCN_10cameras_20m'
 #  dataset_name: 'CASS_600CCN_roiprocess_10cameras_20m'
-  dataset_name: 'HAWAII_2000CCN_10cameras_20m'
+#  dataset_name: 'HAWAII_2000CCN_10cameras_20m'
+#  dataset_name: 'DYCOMS_RF02_500CCN_10cameras_20m'
+  dataset_name: 'DYCOMS_RF02_50CCN_10cameras_20m'
   n_val: -1
 
 ct_net:

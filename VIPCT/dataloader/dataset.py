@@ -37,7 +37,9 @@ ALL_DATASETS = ("BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10camera
                 "subset_of_seven_clouds",
                 "BOMEX_50CCN_10cameras_20m",
                 'CASS_600CCN_roiprocess_10cameras_20m',
-                "HAWAII_2000CCN_10cameras_20m"
+                "HAWAII_2000CCN_10cameras_20m",
+                "DYCOMS_RF02_500CCN_10cameras_20m",
+                "DYCOMS_RF02_50CCN_10cameras_20m",
                 )
 
 
@@ -106,15 +108,25 @@ def get_cloud_datasets(
     elif dataset_name == 'subset_of_seven_clouds':
         data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
         image_size = [48, 48]
+
     elif dataset_name == 'BOMEX_50CCN_10cameras_20m':
         data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
+        image_size = [116, 116]
+    elif dataset_name == 'BOMEX_5000CCN_new_10cameras_20m':
+        data_root = os.path.join(data_root, 'BOMEX_128x128x100_5000CCN_50m_micro_256', '10cameras_20m')
         image_size = [116, 116]
     elif dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
         data_root = os.path.join(data_root, 'CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess', '10cameras_20m')
         image_size = [116, 116]
     elif dataset_name == 'HAWAII_2000CCN_10cameras_20m':
-        data_root = os.path.join(data_root, 'processed_HAWAII_2000CCN_32x64_50m', '10cameras_20m')
+        data_root = os.path.join(data_root, 'HAWAII_2000CCN_32x32x64_50m', '10cameras_20m')
         image_size = [116, 116]
+    elif dataset_name == 'DYCOMS_RF02_50CCN_10cameras_20m':
+        data_root = os.path.join(data_root, 'DYCOMS_RF02_50CCN_64x64x159_50m', '10cameras_20m')
+        image_size = [236, 236]
+    elif dataset_name == 'DYCOMS_RF02_500CCN_10cameras_20m':
+        data_root = os.path.join(data_root, 'DYCOMS_RF02_500CCN_64x64x159_50m', '10cameras_20m')
+        image_size = [236, 236]
     else:
         FileNotFoundError()
 

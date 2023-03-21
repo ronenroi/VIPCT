@@ -50,6 +50,12 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             pred = weighted_bins.sum(-1) # discrete_pred.sum(-1) should be 1
             # confidence = ((prob*(bin_values.repeat(pred.shape[0], 1) - pred[...,None])**2).sum(-1) / (prob.sum(-1)-1))**0.5
             # pred = torch.vstack((pred,pred_std)).T
+        elif pred_type == 'differentiable_max':
+            # prob[:,0] /= 100
+            weights = prob**10
+            weights /= weights.sum(-1)[...,None]
+            weighted_bins = weights * bin_values
+            pred = weighted_bins.sum(-1) # discrete_pred.sum(-1) should be 1
         else:
             NotImplementedError()
         if conf_type=='prob':
@@ -96,7 +102,7 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             cumsum_prob2 = prob_rearange2.cumsum(-1)
             cumsum_prob_total = cumsum_prob1
             cumsum_prob_total[:,1:] += cumsum_prob2[:,:-1]
-            alpha = 0.95
+            alpha = 0.7
             x = cumsum_prob_total - alpha
             conf_interval = (x <= 0).sum(dim=1).float() * 2.0
             confidence = (cumsum_prob_total.shape[-1] - conf_interval) / cumsum_prob_total.shape[-1]

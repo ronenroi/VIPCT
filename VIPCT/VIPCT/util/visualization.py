@@ -108,7 +108,7 @@ class SummaryWriter(object):
         }
         self.scatter_plot_cbfn(kwargs)
 
-    def monitor_images(self, gt_images):
+    def monitor_images(self, gt_images, est_images=[]):
         """
         Monitor the GT images
 
@@ -127,6 +127,15 @@ class SummaryWriter(object):
             'vmax': vmax,
         }
         self.images_cbfn(kwargs)
+        if len(est_images)>0:
+            num_images = est_images.shape[0]
+            kwargs = {
+                'images': est_images,
+                'title': ['Estimated/view{}'.format(view) for view in range(num_images)],
+                'vmax': vmax,
+            }
+            self.images_cbfn(kwargs)
+
 
     def loss_cbfn(self,  kwargs):
         """

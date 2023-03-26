@@ -20,6 +20,7 @@ import hydra
 import numpy as np
 import torch
 from dataloader.dataset import get_cloud_datasets, trivial_collate
+from VIPCT.VIPCT.CTnet import CTnet
 from VIPCT.VIPCT.CTnetV2 import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
@@ -74,8 +75,10 @@ def main(cfg: DictConfig):
         cfg=cfg
     )
     # Initialize VIP-CT model
-    model = CTnetV2(cfg=cfg, n_cam=cfg.data.n_cam)
-
+    if cfg.version == 'V1':
+        model = CTnet(cfg=cfg, n_cam=cfg.data.n_cam)
+    else:
+        model = CTnetV2(cfg=cfg, n_cam=cfg.data.n_cam)
     # Load model
     assert os.path.isfile(checkpoint_resume_path)
     print(f"Resuming from checkpoint {checkpoint_resume_path}.")
@@ -125,6 +128,7 @@ def main(cfg: DictConfig):
             est_vols = torch.zeros(val_volume.extinctions.numel(), device=val_volume.device).reshape(
                 val_volume.extinctions.shape[0], -1)
             n_points_mask = torch.sum(torch.stack(masks)*1.0) if isinstance(masks, list) else masks.sum()
+            conf_vol = torch.ones_like(est_vols[0]) * torch.nan
 
             # don't make inference on empty/small clouds
             if n_points_mask > cfg.min_mask_points:
@@ -136,11 +140,15 @@ def main(cfg: DictConfig):
                     val_volume,
                     masks
                 )
-                if cfg.optimizer.loss == 'CE':
-                    val_out["output"], val_out["output_conf"] = get_pred_and_conf_from_discrete(val_out["output"], cfg.cross_entropy.min,
-                                                               cfg.cross_entropy.max, cfg.cross_entropy.bins, pred_type=cfg.ct_net.pred_type,
+                if cfg.version == 'V2':
+                    val_out["output"], val_out["output_conf"] = get_pred_and_conf_from_discrete(val_out["output"],
+                                                                                                cfg.cross_entropy.min,
+                                                                                                cfg.cross_entropy.max,
+                                                                                                cfg.cross_entropy.bins,
+                                                                                                pred_type=cfg.ct_net.pred_type,
                                                                                                 conf_type=cfg.ct_net.conf_type)
-
+                else:
+                    val_out["output_conf"] = None
                 if val_out['query_indices'] is None:
                     for i, (out_vol, m) in enumerate(zip(val_out["output"],masks)):
                         if m is None:
@@ -165,16 +173,18 @@ def main(cfg: DictConfig):
                             conf_vol = torch.ones_like(est_vol) * torch.nan
                             for col_i in range(m.shape[0]):
                                 est_vol[m[col_i, 0], m[col_i, 1], :] = out_vol[col_i]
-                                conf_vol[m[col_i, 0], m[col_i, 1], :] = val_out["output_conf"][0][col_i]
+                                if val_out["output_conf"] is not None:
+                                    conf_vol[m[col_i, 0], m[col_i, 1], :] = val_out["output_conf"][0][col_i]
                             mask = masks[0].to(device=est_vol.device)
                             est_vol *= mask
                             conf_vol *= mask
 
                         else:
-                            if len(out_vol.shape)==1:
+                            if len(out_vol.squeeze().shape)==1:
                                 est_vol[m] = out_vol.reshape(-1)
                                 conf_vol = torch.ones_like(est_vol) * torch.nan
-                                conf_vol[m] = val_out["output_conf"][0]
+                                if val_out["output_conf"] is not None:
+                                    conf_vol[m] = val_out["output_conf"][0]
                             else: # value, std
                                 #not supported anymore
                                 assert False
@@ -189,7 +199,11 @@ def main(cfg: DictConfig):
 
             gt_vol = val_volume.extinctions[0].squeeze()
             est_vols = est_vols.squeeze().reshape(gt_vol.shape)
-            conf_vol = conf_vol.squeeze().reshape(gt_vol.shape)
+            if val_out["output_conf"] is not None:
+
+                conf_vol = conf_vol.squeeze().reshape(gt_vol.shape)
+            else:
+                conf_vol = torch.empty(1)
             masks[0] = masks[0].squeeze().reshape(gt_vol.shape)
             est_vols[est_vols<0] = 0
 

@@ -101,7 +101,8 @@ class CTnetV2(torch.nn.Module):
 
     def batchify_mlp(self, image_features, embed_camera_center, query_points, uv, n_query):
         assert self.decoder_type == 'mlp'
-        n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / self.val_n_query))
+        max_n_query = self.n_query if self.training else self.val_n_query
+        n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / max_n_query))
         uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
         query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
         output = [torch.empty(0, device=image_features[0].device)] * len(n_query)
@@ -116,6 +117,8 @@ class CTnetV2(torch.nn.Module):
                 # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
                 latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
                 del query_points_chunk
+                with torch.cuda.device(device=image_features[0].device):
+                    torch.cuda.empty_cache()
             if embed_camera_center is not None:
                 embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
                                                                                     latent_chunk.shape[0],
@@ -124,6 +127,10 @@ class CTnetV2(torch.nn.Module):
                 latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
             output_chunk = self.decoder(latent_chunk)
+            del latent_chunk
+            with torch.cuda.device(device=image_features[0].device):
+                torch.cuda.empty_cache()
+
             output_chunk = torch.split(output_chunk, n_split)
             output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
         return output
@@ -133,7 +140,8 @@ class CTnetV2(torch.nn.Module):
         n_query_z = int(torch.tensor(n_query).sum() / z_size)
         query_points = query_points.reshape(n_query_z,z_size,-1)
         uv = [p.reshape(-1,n_query_z,z_size,2) for p in uv]
-        n_chunk = int(torch.ceil(torch.tensor(n_query_z / self.val_n_query)))
+        max_n_query = self.n_query if self.training else self.val_n_query
+        n_chunk = int(torch.ceil(torch.tensor(n_query_z / max_n_query)))
         uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
         query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
         output = [torch.empty(0, device=image_features[0].device)] * len(n_query)
@@ -148,6 +156,9 @@ class CTnetV2(torch.nn.Module):
                 # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
                 latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
                 del query_points_chunk
+                with torch.cuda.device(device=image_features[0].device):
+                    torch.cuda.empty_cache()
+
             if embed_camera_center is not None:
                 embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
                                                                                     latent_chunk.shape[0],
@@ -191,6 +202,9 @@ class CTnetV2(torch.nn.Module):
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
 
         del image
+        with torch.cuda.device(device=image_features[0].device):
+            torch.cuda.empty_cache()
+
         if self.training and not self.decoder_batchify:
             if self.use_neighbours:
                 volume, query_points, _ = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
@@ -212,6 +226,8 @@ class CTnetV2(torch.nn.Module):
         else:
             embed_camera_center = None
         del cameras
+        with torch.cuda.device(device=image_features[0].device):
+            torch.cuda.empty_cache()
 
         if self.mlp_xyz:
             query_points = torch.vstack(query_points).view(-1,3)
@@ -226,12 +242,18 @@ class CTnetV2(torch.nn.Module):
                 latent = latent.reshape(latent.shape[0],-1)
                 latent = torch.cat((latent,query_points),-1)
                 del query_points
+                with torch.cuda.device(device=image_features[0].device):
+                    torch.cuda.empty_cache()
+
             if embed_camera_center is not None:
                 embed_camera_center = embed_camera_center.reshape(embed_camera_center.shape[0],-1)
                 embed_camera_center = embed_camera_center.expand(latent.shape[0],-1)
                 latent = torch.cat((latent, embed_camera_center), -1)
 
                 del embed_camera_center
+                with torch.cuda.device(device=image_features[0].device):
+                    torch.cuda.empty_cache()
+
             if self.decoder_type == 'mlp':
                 output = self.decoder(latent)
             elif self.decoder_type == 'transformer':

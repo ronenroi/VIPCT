@@ -104,7 +104,7 @@ class CTnet(torch.nn.Module):
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
 
         del image
-        if self.training:
+        if self.training and self.query_point_method != 'all':
             if self.use_neighbours:
                 volume, query_points, _ = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
             else:
@@ -127,7 +127,7 @@ class CTnet(torch.nn.Module):
         else:
             query_points = None
 
-        if self.training:
+        if self.training and self.query_point_method != 'all':
             latent = self._image_encoder.sample_roi(image_features, uv)#.transpose(1, 2)
             if self.stop_encoder_grad:
                 latent = [lat.detach() for lat in latent]

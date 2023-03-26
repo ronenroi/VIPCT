@@ -5,305 +5,70 @@ import shdom
 import dill as pickle
 import torch
 from VIPCT.renderer.shdom_util import Monotonous
-class ForwardModel(object):
-    def __init__(self, input_dir):
-        super(ForwardModel, self).__init__()
-        medium, solver, measurements = shdom.load_forward_model(input_dir)
-        # self.data = np.load(input_dir + '.npz')
-        self.camera = measurements.camera
-        self.atmospheric_grid = medium.grid
-        self.air = medium.get_scatterer('air')
-        self.droplets = medium.get_scatterer('cloud')
-        self.x_shape = self.droplets.lwc.shape
-        self.mask = self.droplets.lwc.data > 0
-        self.scene_parameters = solver._scene_parameters
-        self.numerical_parameters = solver._numerical_parameters
-        self.solvers_list = []
-
-    def init_solution(self):
-        self.solvers_list = []
-    def forward(self, x):
-        # x.shape = (N_batch, Nx, Ny, Nz)
-        # solvers_list = []
-        if isinstance(x, torch.Tensor):
-            x_type = 'tensor'
-            device = x.device
-            x = x.detach().cpu().numpy()
-
-        else:
-            x_type = 'numpy'
-        if len(x.shape) == 3:
-            x = x[None, ...]
-        solvers_list = self.solvers_list
-        if len(solvers_list) == 0:
-            for xi in x:
-                lwc = self.droplets._lwc
-                lwc._data = xi.reshape(self.x_shape)
-                rte_solver = shdom.RteSolver(self.scene_parameters, self.numerical_parameters)
-                atmosphere = shdom.Medium(self.atmospheric_grid)
-                atmosphere.add_scatterer(self.air, name='air')
-                atmosphere.add_scatterer(self.droplets, name='cloud')
-                rte_solver.set_medium(atmosphere)
-                solvers_list.append(rte_solver)
-        else:
-            for xi, solver in zip(x, solvers_list):
-                lwc = self.droplets._lwc
-                lwc._data = xi.reshape(self.x_shape)
-                atmosphere = shdom.Medium(self.atmospheric_grid)
-                atmosphere.add_scatterer(self.air, name='air')
-                atmosphere.add_scatterer(self.droplets, name='cloud')
-                solver.set_medium(atmosphere)
-
-        rte_solver_array = shdom.RteSolverArray(solvers_list)
-        rte_solver_array.solve(maxiter=1, verbose=False)
-        images = np.array(self.camera.render(rte_solver_array, n_jobs=8))
-        if len(images.shape) == 3:
-            images = images[..., None]
-        y = images.transpose((3, 0, 1, 2))  # .view((x.shape[0],-1))
-        if x_type == 'tensor':
-            y = torch.tensor(y).to(device=device)
-        return y
-
-    def __call__(self, x):
-        return self.forward(x)
+import matplotlib.pyplot as plt
 
 
-class DiffRenderer(object):
-
-    def __init__(self, n_jobs=1, init_solution=True):
-        self._medium = None
-        self._rte_solver = None
-        self._measurements = None
-        self._writer = None
-        self._images = None
-        self._iteration = 0
-        self._loss = None
-        self._n_jobs = n_jobs
-        self._init_solution = init_solution
-        self._mask = None
-
-    def set_measurements(self, measurements):
-        """
-        Set the measurements (data-fit constraints)
-
-        Parameters
-        ----------
-        measurements: shdom.Measurements
-            A measurements object storing the acquired images and sensor geometry
-        """
-        self._measurements = measurements
-
-    def set_medium_estimator(self, medium_estimator):
-        """
-        Set the MediumEstimator for the optimizer.
-
-        Parameters
-        ----------
-        medium_estimator: shdom.MediumEstimator
-            The MediumEstimator
-        """
-        self._medium = medium_estimator
-
-    def set_mask(self, mask):
-        """
-        Set the Mask for the optimizer.
-
-        Parameters
-        ----------
-        mask: numpy array
-            The Mask
-        """
-        self._mask = mask
-
-    def objective_fun(self, state):
-        """
-        The objective function (cost) and gradient at the current state.
-
-        Parameters
-        ----------
-        state: np.array(shape=(self.num_parameters, dtype=np.float64)
-            The current state vector
-
-        Returns
-        -------
-        loss: np.float64
-            The total loss accumulated over all pixels
-        gradient: np.array(shape=(self.num_parameters), dtype=np.float64)
-            The gradient of the objective function with respect to the state parameters
-
-        Notes
-        -----
-        This function also saves the current synthetic images for visualization purpose
-        """
-        if self.iteration == 0:
-            self.init_optimizer()
-        # self._iteration += 1
-        self.set_state(state)
-        gradient, loss, images = self.medium.compute_gradient(
-            rte_solvers=self.rte_solver,
-            measurements=self.measurements,
-            n_jobs=self.n_jobs
-        )
-        # import matplotlib.pyplot as plt
-        # f, axarr = plt.subplots(1, len(images), figsize=(16, 16))
-        # for ax, image in zip(axarr, images):
-        #     ax.imshow(image)
-        #     ax.invert_xaxis()
-        #     ax.invert_yaxis()
-        #     ax.axis('off')
-        # plt.show()
-        self._loss = loss
-        self._images = images
-        return loss, gradient
-
-
-
-    def init_optimizer(self):
-        """
-        Initialize the optimizer.
-        This means:
-          1. Setting the RteSolver medium
-          2. Initializing a solution
-          3. Computing the direct solar flux derivatives
-          4. Counting the number of unknown parameters
-        """
-
-        assert self.rte_solver.num_solvers == self.measurements.num_channels == self.medium.num_wavelengths, \
-            'RteSolver has {} solvers, Measurements have {} channels and Medium has {} wavelengths'.format(
-                self.rte_solver.num_solvers, self.measurements.num_channels, self.medium.num_wavelengths)
-
-        self.rte_solver.set_medium(self.medium)
-        self.rte_solver.init_solution()
-        self.medium.compute_direct_derivative(self.rte_solver)
-        self._num_parameters = self.medium.num_parameters
-
-    def callback(self, state):
-        """
-        The callback function invokes the callbacks defined by the writer (if any).
-        Additionally it keeps track of the iteration number.
-
-        Parameters
-        ----------
-        state: np.array(shape=(self.num_parameters, dtype=np.float64)
-            The current state vector
-        """
-        self._iteration += 1
-
-        # Writer callback functions
-        if self.writer is not None:
-            for callbackfn, kwargs in zip(self.writer.callback_fns, self.writer.kwargs):
-                time_passed = time.time() - kwargs['ckpt_time']
-                if time_passed > kwargs['ckpt_period']:
-                    kwargs['ckpt_time'] = time.time()
-                    callbackfn(kwargs)
-    def get_bounds(self):
-        """
-        Retrieve the bounds for every parameter from the MediumEstimator (used by scipy.minimize)
-
-        Returns
-        -------
-        bounds: list of tuples
-            The lower and upper bound of each parameter
-        """
-        return self.medium.get_bounds()
-
-    def get_state(self):
-        """
-        Retrieve MediumEstimator state
-
-        Returns
-        -------
-        state: np.array(dtype=np.float64)
-            The state of the medium estimator
-        """
-        return self.medium.get_state()
-
-    def set_state(self, state):
-        """
-        Set the state of the optimization. This means:
-          1. Setting the MediumEstimator state
-          2. Updating the RteSolver medium
-          3. Computing the direct solar flux
-          4. Computing the current RTE solution with the previous solution as an initialization
-
-        Returns
-        -------
-        state: np.array(dtype=np.float64)
-            The state of the medium estimator
-        """
-        self.medium.set_state(state)
-        self.rte_solver.set_medium(self.medium)
-        if self._init_solution is False:
-            self.rte_solver.make_direct()
-        self.rte_solver.solve(maxiter=100, init_solution=self._init_solution, verbose=False)
-
-    def save_state(self, path):
-        """
-        Save Optimizer state to file.
-
-        Parameters
-        ----------
-        path: str,
-            Full path to file.
-        """
-        file = open(path, 'wb')
-        file.write(pickle.dumps(self.get_state(), -1))
-        file.close()
-
-    def load_state(self, path):
-        """
-        Load Optimizer from file.
-
-        Parameters
-        ----------
-        path: str,
-            Full path to file.
-        """
-        file = open(path, 'rb')
-        data = file.read()
-        file.close()
-        state = pickle.loads(data)
-        self.set_state(state)
-
-    @property
-    def rte_solver(self):
-        return self._rte_solver
-
-    @property
-    def medium(self):
-        return self._medium
-
-    @property
-    def measurements(self):
-        return self._measurements
-
-    @property
-    def num_parameters(self):
-        return self._num_parameters
-
-    @property
-    def writer(self):
-        return self._writer
-
-    @property
-    def iteration(self):
-        return self._iteration
-
-    @property
-    def mask(self):
-        return self._mask
-
-    @property
-    def n_jobs(self):
-        return self._n_jobs
-
-    @property
-    def loss(self):
-        return self._loss
-
-    @property
-    def images(self):
-        return self._images
+# class ForwardModel(object):
+#     def __init__(self, input_dir):
+#         super(ForwardModel, self).__init__()
+#         medium, solver, measurements = shdom.load_forward_model(input_dir)
+#         # self.data = np.load(input_dir + '.npz')
+#         self.camera = measurements.camera
+#         self.atmospheric_grid = medium.grid
+#         self.air = medium.get_scatterer('air')
+#         self.droplets = medium.get_scatterer('cloud')
+#         self.x_shape = self.droplets.lwc.shape
+#         self.mask = self.droplets.lwc.data > 0
+#         self.scene_parameters = solver._scene_parameters
+#         self.numerical_parameters = solver._numerical_parameters
+#         self.solvers_list = []
+#
+#     def init_solution(self):
+#         self.solvers_list = []
+#     def forward(self, x):
+#         # x.shape = (N_batch, Nx, Ny, Nz)
+#         # solvers_list = []
+#         if isinstance(x, torch.Tensor):
+#             x_type = 'tensor'
+#             device = x.device
+#             x = x.detach().cpu().numpy()
+#
+#         else:
+#             x_type = 'numpy'
+#         if len(x.shape) == 3:
+#             x = x[None, ...]
+#         solvers_list = self.solvers_list
+#         if len(solvers_list) == 0:
+#             for xi in x:
+#                 lwc = self.droplets._lwc
+#                 lwc._data = xi.reshape(self.x_shape)
+#                 rte_solver = shdom.RteSolver(self.scene_parameters, self.numerical_parameters)
+#                 atmosphere = shdom.Medium(self.atmospheric_grid)
+#                 atmosphere.add_scatterer(self.air, name='air')
+#                 atmosphere.add_scatterer(self.droplets, name='cloud')
+#                 rte_solver.set_medium(atmosphere)
+#                 solvers_list.append(rte_solver)
+#         else:
+#             for xi, solver in zip(x, solvers_list):
+#                 lwc = self.droplets._lwc
+#                 lwc._data = xi.reshape(self.x_shape)
+#                 atmosphere = shdom.Medium(self.atmospheric_grid)
+#                 atmosphere.add_scatterer(self.air, name='air')
+#                 atmosphere.add_scatterer(self.droplets, name='cloud')
+#                 solver.set_medium(atmosphere)
+#
+#         rte_solver_array = shdom.RteSolverArray(solvers_list)
+#         rte_solver_array.solve(maxiter=1, verbose=False)
+#         images = np.array(self.camera.render(rte_solver_array, n_jobs=8))
+#         if len(images.shape) == 3:
+#             images = images[..., None]
+#         y = images.transpose((3, 0, 1, 2))  # .view((x.shape[0],-1))
+#         if x_type == 'tensor':
+#             y = torch.tensor(y).to(device=device)
+#         return y
+#
+#     def __call__(self, x):
+#         return self.forward(x)
 
 
 class LossSHDOM(torch.autograd.Function):
@@ -398,19 +163,23 @@ class DiffRendererSHDOM(object):
     def get_rte_solver(self,cfg):
         if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
             path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/solver2.pkl'
-        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m':
+        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or 'BOMEX_50CCN_aux_10cameras_20m':
             path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/train/solver.pkl'
         else:
             NotImplementedError()
         solver = shdom.RteSolver()
         solver.load_params(path)
+        # params = solver._numerical_parameters
+        # params.num_mu_bins = 2
+        # params.num_phi_bins = 4
+        # solver.set_numerics(params)
         self.wavelength = solver.wavelength
         return shdom.RteSolverArray([solver])
 
     def get_projections(self,cfg):
         if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
             path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/shdom_projections2.pkl'
-        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m':
+        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or 'BOMEX_50CCN_aux_10cameras_20m':
             path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/train/shdom_projections.pkl'
         else:
             NotImplementedError()
@@ -486,11 +255,11 @@ class DiffRendererSHDOM(object):
             medium_estimator.set_grid(cloud_estimator.grid)
 
 
-        ext_fixed = self.cloud_generator.get_extinction(grid=grid)
-        ext_fixed._data[np.bitwise_not(mask)] = cloud_extinction[np.bitwise_not(mask)]
-        ext_fixed._data[mask] = 0
-        cloud_fixed = shdom.OpticalScatterer(self.wavelength, ext_fixed, albedo, phase)
-        medium_estimator.add_scatterer(cloud_fixed, 'cloud_fixed')
+        # ext_fixed = self.cloud_generator.get_extinction(grid=grid)
+        # ext_fixed._data[np.bitwise_not(mask)] = cloud_extinction[np.bitwise_not(mask)]
+        # ext_fixed._data[mask] = 0
+        # cloud_fixed = shdom.OpticalScatterer(self.wavelength, ext_fixed, albedo, phase)
+        # medium_estimator.add_scatterer(cloud_fixed, 'cloud_fixed')
 
 
         return medium_estimator
@@ -580,10 +349,19 @@ class DiffRendererSHDOM(object):
         cloud[:, 0, :] = 0
         cloud[:, -1, :] = 0
         cloud[:, :,-1] = 0
-
+        cloud[cloud<0] = 0
+        cloud[cloud>300] = 300
+        gt_images = gt_images.squeeze() #view x H x W
         gt_images *= self.image_std
         gt_images += self.image_mean
-        gt_images = gt_images.cpu().numpy()
+        gt_images = list(gt_images)
+        # gt_images = gt_images.cpu().numpy()
+        # mask_images = gt_images>0.02
+        # masked_proj_list =[]
+        # for proj, mask_image in zip(self.cameras.projection.projection_list, mask_images[0]):
+        #     masked_proj_list.append(proj[mask_image.ravel('F')])
+        #
+        # masked_camera = shdom.Camera(self.cameras.sensor, shdom.MultiViewProjection(masked_proj_list))
         self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
         cloud_state = cloud[mask]
 
@@ -596,24 +374,48 @@ class DiffRendererSHDOM(object):
         self.set_state(cloud_state.detach().cpu().numpy())
 
         # self._iteration += 1
-        gradient, loss, images = self.medium.compute_gradient(
+        gradient, loss, pixels = self.medium.compute_gradient(
             rte_solvers=self.rte_solver,
             measurements=self.measurements,
             n_jobs=self.n_jobs
         )
-        # import matplotlib.pyplot as plt
-        # f, axarr = plt.subplots(1, len(images), figsize=(16, 16))
-        # for ax, image in zip(axarr, images):
-        #     ax.imshow(image)
-        #     ax.invert_xaxis()
-        #     ax.invert_yaxis()
-        #     ax.axis('off')
+        gt_images = np.array(gt_images)
+        images = np.array(pixels)
+        # images = []
+        # for im, im_gt,masked_im in zip(pixels,gt_images[0],mask_images[0]):
+        #     masked_image = np.zeros(im_gt.size)
+        #     masked_image[masked_im.ravel('F')] = im
+        #     images.append(masked_image.reshape(masked_im.shape).T)
+        # images = np.array(images)
+        # vmax = max(gt_images[5].max().item(),images[5].max())
+        # f, axarr = plt.subplots(1, 3)
+        # axarr[0].imshow(gt_images[5],vmin=0,vmax=vmax)
+        # axarr[1].imshow(images[5], vmin=0, vmax=vmax)
+        # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
         # plt.show()
-        self.loss = loss
+        #
+        plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
+        plt.axis('square')
+        plt.show()
+        # f, axarr = plt.subplots(3, len(images))
+        # for ax, image,gt in zip(axarr.T, images,gt_images[0]):
+        #     ax[0].imshow(image)
+        #     ax[1].imshow(gt)
+        #     ax[2].imshow(np.abs(gt-image))
+        #     # ax.invert_xaxis()
+        #     # ax.invert_yaxis()
+        #     ax[0].axis('off')
+        #     ax[1].axis('off')
+        #     ax[2].axis('off')
+        # plt.tight_layout()
+        # plt.show()
+
+        print(np.sum(np.array(gt_images)-images)**2)
+        self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
         self.images = images
         self.gt_images = gt_images
         self.gradient = gradient
-        l2_loss = self.loss_shdom(cloud_state,self) / gt_images.size
+        l2_loss = self.loss_shdom(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
         return self.loss_operator(l2_loss)
 
 

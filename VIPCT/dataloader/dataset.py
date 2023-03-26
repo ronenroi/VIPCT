@@ -36,6 +36,7 @@ ALL_DATASETS = ("BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10camera
                 "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds",
                 "BOMEX_50CCN_10cameras_20m",
+                "BOMEX_50CCN_aux_10cameras_20m",
                 'CASS_600CCN_roiprocess_10cameras_20m',
                 "HAWAII_2000CCN_10cameras_20m",
                 "DYCOMS_RF02_500CCN_10cameras_20m",
@@ -111,6 +112,9 @@ def get_cloud_datasets(
 
     elif dataset_name == 'BOMEX_50CCN_10cameras_20m':
         data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
+        image_size = [116, 116]
+    elif dataset_name == 'BOMEX_50CCN_aux_10cameras_20m':
+        data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256_aux4', '10cameras_20m')
         image_size = [116, 116]
     elif dataset_name == 'BOMEX_5000CCN_new_10cameras_20m':
         data_root = os.path.join(data_root, 'BOMEX_128x128x100_5000CCN_50m_micro_256', '10cameras_20m')

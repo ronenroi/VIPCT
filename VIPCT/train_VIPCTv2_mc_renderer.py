@@ -35,7 +35,7 @@ from losses.losses import *
 from probability.discritize import *
 from VIPCT.scene.volumes import Volumes
 from VIPCT.scene.cameras import PerspectiveCameras
-from VIPCT.renderer.shdom_renderer import DiffRendererSHDOM, LossSHDOM
+from VIPCT.renderer.mc_renderer import DiffRendererMC
 # from shdom.shdom_nn import *
 import matplotlib.pyplot as plt
 
@@ -85,6 +85,7 @@ def main(cfg: DictConfig):
         model = CTnet(cfg=cfg, n_cam=cfg.data.n_cam)
     else:
         model = CTnetV2(cfg=cfg, n_cam=cfg.data.n_cam)
+
     # Move the model to the relevant device.
     model.to(device)
     # Init stats to None before loading.
@@ -168,12 +169,13 @@ def main(cfg: DictConfig):
     # err = torch.nn.L1Loss(reduction='sum')
     # Set the model to the training mode.
     model.train().float()
-    diff_renderer_shdom = DiffRendererSHDOM(cfg=cfg)
+    diff_renderer_shdom = DiffRendererMC(cfg=cfg,device=device)
 
     if cfg.ct_net.stop_encoder_grad:
         for name, param in model.named_parameters():
             # if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
             if 'decoder' in name:
+
                 param.requires_grad = True
             else:
                 param.requires_grad = False
@@ -194,8 +196,8 @@ def main(cfg: DictConfig):
                 # Adjust the learning rate.
                 lr_scheduler.step()
 
-            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
-            volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
+            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch  # [0]#.values()
+            volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
 
             if model.mask_type == 'gt_mask':
                 masks = volume.extinctions[0] > volume._ext_thr
@@ -204,9 +206,10 @@ def main(cfg: DictConfig):
                 print('Empty mask skip')
                 continue
             images = torch.tensor(np.array(images), device=device).float()
-            cameras = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),
-                                         camera_center= torch.tensor(camera_center, device=device).float(), device=device)
-
+            cameras = PerspectiveCameras(image_size=image_sizes,
+                                         P=torch.tensor(projection_matrix, device=device).float(),
+                                         camera_center=torch.tensor(camera_center, device=device).float(),
+                                         device=device)
 
             optimizer.zero_grad()
 
@@ -218,15 +221,14 @@ def main(cfg: DictConfig):
                 masks
             )
             if cfg.version == 'V1':
-                conf_vol = None
                 mask_conf = masks[0]
             else:
                 out["output"], out["output_conf"] = get_pred_and_conf_from_discrete(out["output"],
-                                                                                    cfg.cross_entropy.min,
-                                                                                    cfg.cross_entropy.max,
-                                                                                    cfg.cross_entropy.bins,
-                                                                                    pred_type=cfg.ct_net.pred_type,
-                                                                                    conf_type=cfg.ct_net.conf_type)
+                                                                                        cfg.cross_entropy.min,
+                                                                                        cfg.cross_entropy.max,
+                                                                                        cfg.cross_entropy.bins,
+                                                                                        pred_type=cfg.ct_net.pred_type,
+                                                                                        conf_type=cfg.ct_net.conf_type)
                 conf_vol = torch.zeros(volume.extinctions.numel(), device=volume.device)
                 conf_vol[out['query_indices'][0]] = out["output_conf"][0]
                 conf_vol = conf_vol.reshape(volume.extinctions.shape[2:]).to(device=masks[0].device)
@@ -235,6 +237,7 @@ def main(cfg: DictConfig):
             est_vol = torch.zeros(volume.extinctions.numel(), device=volume.device)
             est_vol[out['query_indices'][0]] = out["output"][0].squeeze()
             est_vol = est_vol.reshape(volume.extinctions.shape[2:])
+
 
             # if mask_conf.sum()>2000:
             #     print('skip')
@@ -245,23 +248,19 @@ def main(cfg: DictConfig):
             loss = diff_renderer_shdom.render(est_vol, mask_conf, volume, images)
             gt_vol = extinction[0]
             M = masks[0].detach().cpu()
-            if conf_vol is not None:
-                plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu(),
+            plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu(),
                         c=conf_vol[M].ravel().cpu().detach())
-            else:
-                plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu())
             plt.colorbar()
             plt.plot([0, gt_vol[M].ravel().max()], [0, gt_vol[M].ravel().max()], 'r')
             plt.xlabel('gt')
             plt.ylabel('est')
             plt.axis('square')
             plt.show()
-            if conf_vol is not None:
-                plt.scatter(np.abs(gt_vol[M].ravel() - est_vol[M].ravel().cpu().detach().numpy()),
-                            conf_vol[M].ravel().cpu().detach())
-                plt.xlabel('|gt-est|')
-                plt.ylabel('confidence')
-                plt.show()
+            plt.scatter(np.abs(gt_vol[M].ravel() - est_vol[M].ravel().cpu().detach().numpy()),
+                        conf_vol[M].ravel().cpu().detach())
+            plt.xlabel('|gt-est|')
+            plt.ylabel('confidence')
+            plt.show()
 
             # loss_shdom(est_vol , diff_renderer_shdom)
 
@@ -297,7 +296,7 @@ def main(cfg: DictConfig):
                     writer.monitor_scatterer_error(relative_mass_err, relative_err)
                     for ind in range(len(out["output"])):
                         writer.monitor_scatter_plot(out["output"][ind], out["volume"][ind],ind=ind)
-                        writer.monitor_images(diff_renderer_shdom.gt_images,np.array(diff_renderer_shdom.images))
+                        writer.monitor_images(diff_renderer_shdom.gt_images[0],np.array(diff_renderer_shdom.images))
 
             del images
             with torch.cuda.device(device=device):
@@ -331,8 +330,7 @@ def main(cfg: DictConfig):
                             val_volume,
                             masks
                         )
-                        if cfg.version == 'V2':
-                            val_out["output"] = get_pred_from_discrete(val_out["output"], cfg.cross_entropy.min,
+                        val_out["output"] = get_pred_from_discrete(val_out["output"], cfg.cross_entropy.min,
                                                               cfg.cross_entropy.max, cfg.cross_entropy.bins)
 
                         est_vols = torch.zeros(torch.squeeze(val_volume.extinctions,1).shape, device=val_volume.device)

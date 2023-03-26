@@ -21,12 +21,11 @@ import hydra
 import numpy as np
 import torch
 from dataloader.dataset import get_cloud_datasets, trivial_collate
-from VIPCT.CTnet import *
-from VIPCT.util.stats import Stats
+from VIPCT.VIPCT.CTnet import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
-from VIPCT.util.plot_util import *
-from VIPCT.util.visualization import SummaryWriter
+from VIPCT.VIPCT.util.plot_util import *
+from VIPCT.VIPCT.util.visualization import SummaryWriter
 import scipy.io as sio
 from VIPCT.scene.volumes import Volumes
 

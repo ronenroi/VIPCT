@@ -10,8 +10,8 @@ def cloud_histograms():
         "/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/test",
         "/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/test",
         "/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/test",
-        "/wdata/roironen/Data/DYCOMS_RF02_500CCN_32x128_50m/10cameras_20m/test",
-        "/wdata/roironen/Data/DYCOMS_RF02_50CCN_32x128_50m/10cameras_20m/test",
+        "/wdata/roironen/Data/DYCOMS_RF02_500CCN_64x64x159_50m/10cameras_20m/test",
+        "/wdata/roironen/Data/DYCOMS_RF02_50CCN_64x64x159_50m/10cameras_20m/test",
 
     ]
     exts = []

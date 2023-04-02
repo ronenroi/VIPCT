@@ -151,8 +151,8 @@ if __name__ == "__main__":
     else:
         import os
         DEFAULT_DATA_ROOT = '/home/roironen/Data'
-        data_root = '/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras/train'
-        data_root = '/wdata/roironen/Data/CASS_50m_256x256x139_600CCN/10cameras_20m/train'
+        data_root = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/train'
+        # data_root = '/wdata/roironen/Data/CASS_50m_256x256x139_600CCN/10cameras_20m/train'
         if False:
 
             image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC/satellites_images_856.pkl'
@@ -178,16 +178,20 @@ if __name__ == "__main__":
 
         else:
             import glob
-            with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl',
-                    'rb') as f:
+            p = "/wdata/roironen/Data/AirMSPI/training/32x32x64_images_mapping.pkl"
+            # p = '/wdata/roironen/Data/AirMSPI-Varying/training/rebat_images_mapping_lists32x32x32_BOMEX_img350x350.pkl'
+            with open(p, 'rb') as f:
                 images_mapping_list = pickle.load(f)[1]
-            with open('/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl',
-                    'rb') as f:
+
+            # p2 = '/wdata/roironen/Data/AirMSPI-Varying/training/rebat_pixel_centers_lists32x32x32_BOMEX_img350x350.pkl'
+            p2 = '/wdata/roironen/Data/AirMSPI/training/32x32x64_pixel_centers.pkl'
+            with open(p2, 'rb') as f:
                 pixel_centers_lists = pickle.load(f)
             # image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/AIRMSPI_IMAGES_LWC_LOW_SC/satellites_images_856.pkl'
-            image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/'
+            # image_root = '/wdata/yaelsc/Data/CASS_50m_256x256x139_600CCN/pushbroom/ROI/'
+            image_root = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/renderings_BOMEX_32x32x64_50CCN_50m'
             image_root = [f for f in glob.glob(os.path.join(image_root, "SIMULATED_AIRMSPI_TRAIN*"))]
-            image_root = [glob.glob(os.path.join(f, "*856.pkl")) for f in image_root][1][-1]
+            image_root = [glob.glob(os.path.join(f, "*981.pkl")) for f in image_root][1][-1]
 
         # val_image = torch.tensor(val_images, device=device).float()[None]
         # masks = sio.loadmat('/wdata/yaelsc/AirMSPI_raw_data/raw_data/mask_72x72x32_vox50x50x40m.mat')['mask']
@@ -208,7 +212,7 @@ if __name__ == "__main__":
         EXT = torch.tensor(masks)
         indices = torch.topk(torch.tensor(x['ext']).reshape(-1), 10).indices
         N=int(np.sum(x['ext']>0))
-        indices = torch.topk(EXT.reshape(-1), N).indices#[torch.randperm(N)[:1000]]
+        indices = torch.topk(EXT.reshape(-1), N).indices[torch.randperm(N)[:1000]]
 
 
         mapping = [ np.array(map)[indices] for map in images_mapping_list]

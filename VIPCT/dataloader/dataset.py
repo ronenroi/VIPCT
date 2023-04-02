@@ -31,7 +31,7 @@ import scipy.io as sio
 DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
 
-ALL_DATASETS = ("BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
+ALL_DATASETS = ("Toy_10cameras_20m","BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
                 "BOMEX_10cameras_50m", "BOMEX_32cameras_20m", "BOMEX_32cameras_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
                 "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds",
@@ -131,6 +131,10 @@ def get_cloud_datasets(
     elif dataset_name == 'DYCOMS_RF02_500CCN_10cameras_20m':
         data_root = os.path.join(data_root, 'DYCOMS_RF02_500CCN_64x64x159_50m', '10cameras_20m')
         image_size = [236, 236]
+
+    elif dataset_name == 'Toy_10cameras_20m':
+        data_root = os.path.join(data_root, 'Toy', '10cameras_20m')
+        image_size = [116, 116]
     else:
         FileNotFoundError()
 

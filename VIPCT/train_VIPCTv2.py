@@ -23,6 +23,8 @@ import warnings
 import hydra
 import numpy as np
 from dataloader.dataset import get_cloud_datasets, trivial_collate
+from dataloader.airmspi_dataset import get_airmspi_datasets
+
 from VIPCT.VIPCT.util.visualization import SummaryWriter
 from VIPCT.VIPCT.CTnetV2 import *
 from VIPCT.VIPCT.util.stats import Stats
@@ -70,9 +72,14 @@ def main(cfg: DictConfig):
     # Load the training/validation data.
     current_dir = os.path.dirname(os.path.realpath(__file__))
     # DATA_DIR = os.path.join(current_dir, "data")
-    train_dataset, val_dataset = get_cloud_datasets(
-        cfg=cfg
-    )
+    if "AirMSPI" in cfg.data.dataset_name:
+        train_dataset, val_dataset = get_airmspi_datasets(
+            cfg=cfg
+        )
+    else:
+        train_dataset, val_dataset = get_cloud_datasets(
+            cfg=cfg
+        )
 
     # Initialize the CT model.
     model = CTnetV2(cfg=cfg, n_cam=cfg.data.n_cam)
@@ -177,13 +184,25 @@ def main(cfg: DictConfig):
             if iteration in cfg.optimizer.iter_steps:
                 # Adjust the learning rate.
                 lr_scheduler.step()
+            if "AirMSPI" in cfg.data.dataset_name:
+                images, extinction, grid, mapping, centers, masks = batch#[0]#.values()
+                if images[0] is None:
+                    continue
+                cameras = AirMSPICameras(mapping=torch.tensor(mapping).float(),
+                                         centers=torch.tensor(centers).float(),
+                                             device=device)
 
-            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
+            else:
+                images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
+                cameras = PerspectiveCameras(image_size=image_sizes,
+                                             P=torch.tensor(projection_matrix, device=device).float(),
+                                             camera_center=torch.tensor(camera_center, device=device).float(),
+                                             device=device)
+
 
             images = torch.tensor(np.array(images), device=device).float()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
-            cameras = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),
-                                         camera_center= torch.tensor(camera_center, device=device).float(), device=device)
+
             masks = [torch.tensor(mask) if mask is not None else mask for mask in masks]
             if model.mask_type == 'gt_mask':
                 masks = volume.extinctions > volume._ext_thr

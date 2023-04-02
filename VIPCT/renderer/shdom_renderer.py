@@ -164,7 +164,7 @@ class DiffRendererSHDOM(object):
         if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
             path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/solver2.pkl'
         elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or 'BOMEX_50CCN_aux_10cameras_20m':
-            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/train/solver.pkl'
+            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/solver.pkl'
         else:
             NotImplementedError()
         solver = shdom.RteSolver()
@@ -179,8 +179,10 @@ class DiffRendererSHDOM(object):
     def get_projections(self,cfg):
         if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
             path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/shdom_projections2.pkl'
-        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or 'BOMEX_50CCN_aux_10cameras_20m':
-            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/train/shdom_projections.pkl'
+        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or cfg.data.dataset_name == 'BOMEX_50CCN_aux_10cameras_20m':
+            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/shdom_projections.pkl'
+        elif cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
+            path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
         else:
             NotImplementedError()
         with open(path, 'rb') as pickle_file:
@@ -226,10 +228,12 @@ class DiffRendererSHDOM(object):
         medium.load(path)
 
 
-        medium.scatterers['cloud']._reff = self.cloud_generator.get_reff(medium.scatterers['cloud'].grid)
+        cloud = medium.get_scatterer('cloud')
+        cloud.resample(grid)
+        cloud._reff = self.cloud_generator.get_reff(grid)
         # medium.scatterers['cloud']._veff._data[:,:,:] = 0.01
-        medium.scatterers['cloud']._veff._data[cloud_extinction>0] = self.cloud_generator.get_veff(medium.scatterers['cloud'].grid)._data[cloud_extinction>0]
-        phase = medium.scatterers['cloud'].get_phase(self.wavelength)
+        cloud._veff._data[cloud_extinction>0] = self.cloud_generator.get_veff(grid)._data[cloud_extinction>0]
+        phase = cloud.get_phase(self.wavelength)
 
         # phase = self.cloud_generator.get_phase(self.wavelength, mask=cloud_extinction>1.0, grid = phase_grid)
 
@@ -351,7 +355,7 @@ class DiffRendererSHDOM(object):
         cloud[:, :,-1] = 0
         cloud[cloud<0] = 0
         cloud[cloud>300] = 300
-        gt_images = gt_images.squeeze() #view x H x W
+        gt_images = gt_images.squeeze() # view x H x W
         gt_images *= self.image_std
         gt_images += self.image_mean
         gt_images = list(gt_images)
@@ -394,11 +398,11 @@ class DiffRendererSHDOM(object):
         # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
         # plt.show()
         #
-        plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
-        plt.axis('square')
-        plt.show()
+        # plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
+        # plt.axis('square')
+        # plt.show()
         # f, axarr = plt.subplots(3, len(images))
-        # for ax, image,gt in zip(axarr.T, images,gt_images[0]):
+        # for ax, image,gt in zip(axarr.T, images,gt_images):
         #     ax[0].imshow(image)
         #     ax[1].imshow(gt)
         #     ax[2].imshow(np.abs(gt-image))
@@ -410,7 +414,7 @@ class DiffRendererSHDOM(object):
         # plt.tight_layout()
         # plt.show()
 
-        print(np.sum(np.array(gt_images)-images)**2)
+        # print(np.sum(np.array(gt_images)-images)**2)
         self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
         self.images = images
         self.gt_images = gt_images

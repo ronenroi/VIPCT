@@ -44,6 +44,17 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             # confidence = max_score / scores.sum(-1)
             delta = (max - min) / (bins - 1)
             pred = i_max * delta + min
+        elif pred_type == 'max_conv':
+            # scores = torch.exp(discrete_pred)
+            # confidence = max_score / scores.sum(-1)
+            prob_conv = prob[:,1:][:,None]
+            prob_conv = torch.nn.functional.pad(prob_conv,(1,1),mode='replicate')
+            filter = torch.tensor(([0.333,0.333,0.333]),device=prob.device).reshape(1,1,-1)
+            prob_conv1 = torch.nn.functional.conv1d(prob_conv,filter).squeeze(1)
+            prob[:, 1:] = prob_conv1
+            i_max = prob.argmax(-1)
+            delta = (max - min) / (bins - 1)
+            pred = i_max * delta + min
         elif pred_type == 'mean':
             # prob[:,0] /= 100
             weighted_bins = prob * bin_values
@@ -56,6 +67,7 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             weights /= weights.sum(-1)[...,None]
             weighted_bins = weights * bin_values
             pred = weighted_bins.sum(-1) # discrete_pred.sum(-1) should be 1
+            pred[torch.isnan(pred)] = 0
         else:
             NotImplementedError()
         if conf_type=='prob':

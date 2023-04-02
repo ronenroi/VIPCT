@@ -1,18 +1,19 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_FT_BOMEX_50CCN_10cameras_20m_trainset_all_sc_mask_V1/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_FT_HAWAII_2000CCN_10cameras_20m_trainset_all_sc_mask_V2_LR5.0e-06/${now:%H-%M-%S}
 seed: 0
 debug: False
 resume: True
-version: 'V1'
+version: 'V2'
 stats_print_interval: 10
 validation_iter_interval: 10
 checkpoint_iteration_interval: 50
-#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-02-26_VIPCTv2_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_CE_300bins_LR5.0e-05_Gcam_64_Gdomain_64_maskSC/16-46-37/checkpoints/cp_165000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-02-26_VIPCTv2_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_CE_300bins_LR5.0e-05_Gcam_64_Gdomain_64_maskSC/16-46-37/checkpoints/cp_165000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-03-25_FT_BOMEX_50CCN_10cameras_20m_trainset_all_sc_mask_differentiable_maxV2/21-43-43/checkpoints/cp_350.pth'
 gpu: 0
 data:
-  dataset_name: 'BOMEX_50CCN_10cameras_20m'#'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
+  dataset_name: 'HAWAII_2000CCN_10cameras_20m' #'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
   n_training: -1
   n_val: 60
   n_cam: 10
@@ -22,7 +23,7 @@ data:
 
 optimizer:
   max_epochs: 100000
-  lr: 5.0e-05
+  lr: 5.0e-06
   wd: 1.0e-05
   batch_size: 1
   iter_steps: [1000000000]
@@ -69,7 +70,7 @@ backbone:
   modify_first_layer: True
 
 decoder:
-  name: 'FixCTv4' #'CE' #FixCTv4_CE
+  name: 'FixCTv4_CE' #'CE' #FixCTv4_CE
   type: 'mlp' #mlp transformer
   masked: False
   num_masked: 20

@@ -117,8 +117,8 @@ class CTnetV2(torch.nn.Module):
                 # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
                 latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
                 del query_points_chunk
-                with torch.cuda.device(device=image_features[0].device):
-                    torch.cuda.empty_cache()
+                #with torch.cuda.device(device=image_features[0].device):
+   #                 torch.cuda.empty_cache()
             if embed_camera_center is not None:
                 embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
                                                                                     latent_chunk.shape[0],
@@ -156,8 +156,8 @@ class CTnetV2(torch.nn.Module):
                 # query_points_chunk = query_points_chunk.unsqueeze(1).expand(-1, latent_chunk.shape[1], -1)
                 latent_chunk = torch.cat((latent_chunk, query_points_chunk), -1)
                 del query_points_chunk
-                with torch.cuda.device(device=image_features[0].device):
-                    torch.cuda.empty_cache()
+                #with torch.cuda.device(device=image_features[0].device):
+   #                 torch.cuda.empty_cache()
 
             if embed_camera_center is not None:
                 embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
@@ -202,32 +202,42 @@ class CTnetV2(torch.nn.Module):
         image_features = [features.view(Vbatch,self.n_cam,*features.shape[1:]) for features in image_features]
 
         del image
-        with torch.cuda.device(device=image_features[0].device):
-            torch.cuda.empty_cache()
+        #with torch.cuda.device(device=image_features[0].device):
+          #  torch.cuda.empty_cache()
 
         if self.training and not self.decoder_batchify:
             if self.use_neighbours:
-                volume, query_points, _ = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
+                volume, query_points, query_indices = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
             elif self.query_point_method == 'toa_random' or self.query_point_method == 'toa_all':
                 volume, query_points, _ = volume.get_query_points_seq(self.n_query, self.query_point_method, masks=masks)
             else:
-                volume, query_points, _ = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
+                volume, query_points, query_indices = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
         else:
             if self.query_point_method == 'toa_random':
-                volume, query_points, query_indices = volume.get_query_points_seq(self.n_query, self.query_point_val_method,                                                                   masks=masks)
+                volume, query_points, _ = volume.get_query_points_seq(self.n_query, self.query_point_val_method,                                                                   masks=masks)
             else:
                 volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
         n_query = [points.shape[0] for points in query_points]
-        uv = cameras.project_points(query_points, screen=True)
 
-        if self.mlp_cam_center:
-            cam_centers = cameras.get_camera_center()
-            embed_camera_center = self.mlp_cam_center(cam_centers.view(-1,3),cam_centers.view(-1,3)).view(*cam_centers.shape[:-1],-1)
+        if cameras.__class__.__name__ == "AirMSPICameras":
+            pushbroom_camera = True
+            uv, cam_centers = cameras.project_pointsv2(query_indices, screen=True)
+            if self.mlp_cam_center:
+                embed_camera_center = self.mlp_cam_center(cam_centers.view(-1,3),cam_centers.view(-1,3)).view(*cam_centers.shape[:-1],-1)
+            else:
+                embed_camera_center = None
+
         else:
-            embed_camera_center = None
+            pushbroom_camera = False
+            uv = cameras.project_points(query_points, screen=True)
+            if self.mlp_cam_center:
+                cam_centers = cameras.get_camera_center()
+                embed_camera_center = self.mlp_cam_center(cam_centers.view(-1,3),cam_centers.view(-1,3)).view(*cam_centers.shape[:-1],-1)
+            else:
+                embed_camera_center = None
         del cameras
-        with torch.cuda.device(device=image_features[0].device):
-            torch.cuda.empty_cache()
+        #with torch.cuda.device(device=image_features[0].device):
+          #  torch.cuda.empty_cache()
 
         if self.mlp_xyz:
             query_points = torch.vstack(query_points).view(-1,3)
@@ -242,17 +252,21 @@ class CTnetV2(torch.nn.Module):
                 latent = latent.reshape(latent.shape[0],-1)
                 latent = torch.cat((latent,query_points),-1)
                 del query_points
-                with torch.cuda.device(device=image_features[0].device):
-                    torch.cuda.empty_cache()
+                #with torch.cuda.device(device=image_features[0].device):
+   #                 torch.cuda.empty_cache()
 
             if embed_camera_center is not None:
-                embed_camera_center = embed_camera_center.reshape(embed_camera_center.shape[0],-1)
-                embed_camera_center = embed_camera_center.expand(latent.shape[0],-1)
+                if pushbroom_camera:
+                    embed_camera_center = embed_camera_center.squeeze(0).transpose(0, 1)
+                    embed_camera_center = embed_camera_center.reshape(embed_camera_center.shape[0],-1)
+                else:
+                    embed_camera_center = embed_camera_center.reshape(embed_camera_center.shape[0],-1)
+                    embed_camera_center = embed_camera_center.expand(latent.shape[0],-1)
                 latent = torch.cat((latent, embed_camera_center), -1)
 
                 del embed_camera_center
-                with torch.cuda.device(device=image_features[0].device):
-                    torch.cuda.empty_cache()
+                #with torch.cuda.device(device=image_features[0].device):
+   #                 torch.cuda.empty_cache()
 
             if self.decoder_type == 'mlp':
                 output = self.decoder(latent)

@@ -236,32 +236,32 @@ def main(cfg: DictConfig):
             est_vol[out['query_indices'][0]] = out["output"][0].squeeze()
             est_vol = est_vol.reshape(volume.extinctions.shape[2:])
 
-            # if mask_conf.sum()>2000:
-            #     print('skip')
-            #     continue
+            if mask_conf.sum()>5000:
+                print('skip')
+                continue
             print(mask_conf.sum())
             images = images.cpu().numpy()
             # print(est_vol[extinction[0]>0].mean().item())
             loss = diff_renderer_shdom.render(est_vol, mask_conf, volume, images)
-            gt_vol = extinction[0]
-            M = masks[0].detach().cpu()
-            if conf_vol is not None:
-                plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu(),
-                        c=conf_vol[M].ravel().cpu().detach())
-            else:
-                plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu())
-            plt.colorbar()
-            plt.plot([0, gt_vol[M].ravel().max()], [0, gt_vol[M].ravel().max()], 'r')
-            plt.xlabel('gt')
-            plt.ylabel('est')
-            plt.axis('square')
-            plt.show()
-            if conf_vol is not None:
-                plt.scatter(np.abs(gt_vol[M].ravel() - est_vol[M].ravel().cpu().detach().numpy()),
-                            conf_vol[M].ravel().cpu().detach())
-                plt.xlabel('|gt-est|')
-                plt.ylabel('confidence')
-                plt.show()
+            # gt_vol = extinction[0]
+            # M = masks[0].detach().cpu()
+            # if conf_vol is not None:
+            #     plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu(),
+            #             c=conf_vol[M].ravel().cpu().detach())
+            # else:
+            #     plt.scatter(gt_vol[M].ravel(), est_vol[M].ravel().detach().cpu())
+            # plt.colorbar()
+            # plt.plot([0, gt_vol[M].ravel().max()], [0, gt_vol[M].ravel().max()], 'r')
+            # plt.xlabel('gt')
+            # plt.ylabel('est')
+            # plt.axis('square')
+            # plt.show()
+            # if conf_vol is not None:
+            #     plt.scatter(np.abs(gt_vol[M].ravel() - est_vol[M].ravel().cpu().detach().numpy()),
+            #                 conf_vol[M].ravel().cpu().detach())
+            #     plt.xlabel('|gt-est|')
+            #     plt.ylabel('confidence')
+            #     plt.show()
 
             # loss_shdom(est_vol , diff_renderer_shdom)
 

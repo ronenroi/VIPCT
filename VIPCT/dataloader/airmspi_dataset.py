@@ -37,7 +37,9 @@ def trivial_collate(batch):
     batch = np.array(batch, dtype=object).transpose().tolist()
     return batch
 
-ALL_DATASETS_AIRMSPI = ("AirMSPI_BOMEX_50CCN_9cams","AirMSPI_BOMEX_aux_9cams", "AirMSPI_32N123W_experiment_cloud1", "AirMSPI_32N123W_experiment_cloud2", "AirMSPI_18S8E_experiment" )
+ALL_DATASETS_AIRMSPI = ("32N123W_experiment_all_clouds",'32N123W_experiment_234_clouds',
+    "AirMSPI_BOMEX_50CCN_9cams","AirMSPI_BOMEX_aux_9cams", "32N123W_experiment_cloud1", "32N123W_experiment_cloud2", "18S8E_experiment"
+)
 #
 # def get_airmspi_datasets(
 #     cfg,
@@ -432,7 +434,8 @@ def get_airmspi_datasets(
 
     return train_dataset, train_dataset
 
-def get_real_world_airmspi_datasets(
+
+def get_real_world_airmspi_datasets_ft(
     cfg,
     data_root: str = DEFAULT_DATA_ROOT,
 ) -> Tuple[Dataset]:
@@ -456,6 +459,223 @@ def get_real_world_airmspi_datasets(
     if dataset_name not in ALL_DATASETS_AIRMSPI:
         raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
 
+    if dataset_name == '32N123W_experiment_all_clouds':
+        image_paths = [os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/airmspi_9images.mat"),
+                       os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/airmspi_9images.mat"),
+                       os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/airmspi_9images.mat"),
+                       os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/airmspi_9images.mat")
+                       ]
+
+        mapping_paths = [os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/images_mapping.pkl"),
+                         os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/images_mapping.pkl"),
+                         os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/images_mapping.pkl"),
+                         os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/images_mapping.pkl")
+                         ]
+
+        pixel_centers_paths = [os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/pixel_centers.pkl"),
+                               os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/pixel_centers.pkl"),
+                               os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/pixel_centers.pkl"),
+                               os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/pixel_centers.pkl")
+                               ]
+
+        mask_paths = [os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/mask_72x72x32_vox50x50x40m.mat"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/mask_60x60x32_vox50x50x40m.mat"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/mask_72x72x32_vox50x50x40m.mat"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/mask_72x72x32_vox50x50x40m.mat")
+                      ]
+
+        shdom_proj_paths = [os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/projections"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/projections"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/projections"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/projections")
+                      ]
+
+        dx = 0.05
+        dy = 0.05
+        dz = 0.04
+        nx = [72,60,72,72]
+        ny = [72,60,72,72]
+        nz = 32
+
+    elif dataset_name == '32N123W_experiment_234_clouds':
+        image_paths = [
+                       os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/airmspi_9images.mat"),
+                       os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/airmspi_9images.mat"),
+                       os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/airmspi_9images.mat")
+                       ]
+
+        mapping_paths = [
+                         os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/images_mapping.pkl"),
+                         os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/images_mapping.pkl"),
+                         os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/images_mapping.pkl")
+                         ]
+
+        pixel_centers_paths = [
+                               os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/pixel_centers.pkl"),
+                               os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/pixel_centers.pkl"),
+                               os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/pixel_centers.pkl")
+                               ]
+
+        mask_paths = [
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/mask_60x60x32_vox50x50x40m.mat"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/mask_72x72x32_vox50x50x40m.mat"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/mask_72x72x32_vox50x50x40m.mat")
+                      ]
+
+        shdom_proj_paths = [
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/projections"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud3/projections"),
+                      os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud4/projections")
+                      ]
+
+        dx = 0.05
+        dy = 0.05
+        dz = 0.04
+        nx = [60,72,72]
+        ny = [60,72,72]
+        nz = 32
+
+    else:
+        NotImplementedError()
+    ## building map if necessary
+
+    # mapping_paths = [f for f in glob.glob(os.path.join(data_root, 'AirMSPI/test/32N123W_experiment_cloud4/voxel_pixel_list*.pkl'))]
+    # pixel_center_paths = [f for f in glob.glob(os.path.join(data_root, 'AirMSPI/test/32N123W_experiment_cloud4/pixel_centers.mat'))]
+    # images_mapping_lists = []
+    # pixel_centers_lists = []
+    # image_size = [450,450]
+    # for mapping_path, pixel_center_path in zip(mapping_paths, pixel_center_paths):
+    #     with open(mapping_path, 'rb') as f:
+    #         mapping = pickle.load(f)
+    #     images_mapping_list = []
+    #     pixel_centers_list = []
+    #     pixel_centers = sio.loadmat(pixel_center_path)['xpc']
+    #     camera_ind = 0
+    #     for _, map in mapping.items():
+    #         voxels_list = []
+    #         pixel_list = []
+    #         v = map.values()
+    #         voxels = np.array(list(v),dtype=object)
+    #         for i, voxel in enumerate(voxels):
+    #             if len(voxel)>0:
+    #                 pixels = np.unravel_index(voxel, np.array(image_size))
+    #                 mean_px = np.mean(pixels,1)
+    #                 voxels_list.append(mean_px)
+    #                 pixel_list.append(pixel_centers[camera_ind,:,int(mean_px[0]),int(mean_px[1])])
+    #             else:
+    #                 voxels_list.append([-100000,-100000])
+    #                 pixel_list.append([-10000, -10000, -10000])
+    #
+    #         camera_ind += 1
+    #         images_mapping_list.append(voxels_list)
+    #         pixel_centers_list.append(pixel_list)
+    #     images_mapping_lists.append((images_mapping_list))
+    #     pixel_centers_lists.append(pixel_centers_list)
+    # print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
+    # with open(os.path.join(data_root, 'AirMSPI/test/32N123W_experiment_cloud4/72x72x32_images_mapping.pkl'), 'wb') as f:
+    #     pickle.dump(images_mapping_lists, f, pickle.HIGHEST_PROTOCOL)
+    # with open(os.path.join(data_root, 'AirMSPI/test/32N123W_experiment_cloud4/72x72x32_pixel_centers.pkl'), 'wb') as f:
+    #     pickle.dump(pixel_centers_lists, f, pickle.HIGHEST_PROTOCOL)
+    train_len = cfg.data.n_training if cfg.data.n_training > 0 else len(mapping_paths)
+    mapping_paths = mapping_paths[:train_len]
+    pixel_centers_paths = pixel_centers_paths[:train_len]
+    mask_paths = mask_paths[:train_len]
+    shdom_proj_paths = shdom_proj_paths[:train_len]
+    image_paths = image_paths[:train_len]
+    nx = nx[:train_len]
+    ny = ny[:train_len]
+
+    images_mapping_lists = []
+    pixel_centers_lists = []
+    shdom_proj_lists = []
+    mask_lists = []
+
+    for mapping_path, pixel_centers_path, mask_path, shdom_proj_path in zip(mapping_paths, pixel_centers_paths, mask_paths, shdom_proj_paths):
+        mask = sio.loadmat(mask_path)['mask']>0
+        mask_lists.append(mask)
+        with open(mapping_path, 'rb') as f:
+            map = pickle.load(f)
+            # print(np.array(map).shape)
+            map = np.array(map).squeeze()#[:,mask.ravel(),:]
+            if cfg.data.n_cam != 9 and cfg.data.drop_index > -1:
+                map = np.delete(map,cfg.data.drop_index,0)
+            # print(np.array(map).shape)
+            images_mapping_lists.append(map)
+        with open(pixel_centers_path, 'rb') as f:
+            centers = pickle.load(f)
+            # print(np.array(centers).shape)
+            centers = np.array(centers).squeeze()#[:,mask.ravel(),:]
+            if cfg.data.n_cam != 9 and cfg.data.drop_index > -1:
+                centers = np.delete(centers,cfg.data.drop_index,0)
+            # print(np.array(centers).shape)
+            pixel_centers_lists.append(centers)
+        with open(shdom_proj_path, 'rb') as pickle_file:
+            projection_list = pickle.load(pickle_file)['projections']
+            if cfg.data.n_cam != 9 and cfg.data.drop_index > -1:
+                projection_list.pop(cfg.data.drop_index)
+            shdom_proj_lists.append(projection_list)
+
+    # images_mapping_list = [[np.array(map) for map in images_mapping_list]]
+    # pixel_centers_list = [[np.array(centers) for centers in pixel_centers_list]]
+    grids = []
+    for nx_i, ny_i in zip(nx, ny):
+        gx = np.linspace(0, dx * (nx_i-1), nx_i, dtype=np.float32)
+        gy = np.linspace(0, dy * (ny_i-1), ny_i, dtype=np.float32)
+        gz = np.linspace(0, dz * (nz-1), nz, dtype=np.float32)
+        grids.append([np.array([gx, gy, gz])])
+
+    # masks = []
+    # for mask_path in mask_paths:
+    #     masks.append(sio.loadmat(mask_path)['mask'])
+
+    # assert cfg.data.n_training <= 0
+
+    n_cam = cfg.data.n_cam
+    mean = cfg.data.mean
+    std = cfg.data.std
+    dataset = AirMSPIDataset_ft(
+        image_dir = image_paths,
+        mapping=images_mapping_lists,
+        n_cam=n_cam,
+        mask_type=cfg.ct_net.mask_type,
+        mean=mean,
+        std=std,
+        dataset_name = dataset_name,
+        drop_index = cfg.data.drop_index,
+        pixel_centers=pixel_centers_lists,
+        shdom_proj_lists = shdom_proj_lists,
+        mask = mask_lists,
+        grid = grids
+
+    )
+
+    return dataset
+
+
+def get_real_world_airmspi_datasets(
+    cfg,
+    data_root: str = DEFAULT_DATA_ROOT,
+) -> Tuple[Dataset]:
+    """
+    Obtains the training and validation dataset object for a dataset specified
+    with the `dataset_name` argument.
+
+    Args:
+        dataset_name: The name of the dataset to load.
+        image_size: A tuple (height, width) denoting the sizes of the loaded dataset images.
+        data_root: The root folder at which the data is stored.
+
+    Returns:
+        train_dataset: The training dataset object.
+        val_dataset: The validation dataset object.
+        test_dataset: The testing dataset object.
+    """
+
+    dataset_name = cfg.data.dataset_name
+
+    if dataset_name not in ALL_DATASETS_AIRMSPI:
+        raise ValueError(f"'{dataset_name}'' does not refer to a known dataset.")
+    projection_list = None
     if dataset_name == '32N123W_experiment_cloud1':
         image_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/airmspi_9images.mat")
         mapping_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/images_mapping.pkl")
@@ -467,6 +687,13 @@ def get_real_world_airmspi_datasets(
         nx = 72
         ny = 72
         nz = 32
+
+        shdom_proj_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud1/projections")
+        with open(shdom_proj_path, 'rb') as pickle_file:
+            projection_list = pickle.load(pickle_file)['projections']
+            if cfg.data.n_cam != 9 and cfg.data.drop_index > -1 and cfg.rerender:
+                projection_list = [projection_list[cfg.data.drop_index]]
+
     elif dataset_name == '32N123W_experiment_cloud2':
         image_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/airmspi_9images.mat")
         mapping_path = os.path.join(data_root, "AirMSPI/test/32N123W_experiment_cloud2/images_mapping.pkl")
@@ -535,13 +762,13 @@ def get_real_world_airmspi_datasets(
     # images_mapping_list = [[np.array(map) for map in images_mapping_list]]
     # pixel_centers_list = [[np.array(centers) for centers in pixel_centers_list]]
 
-    gx = np.linspace(0, dx * nx, nx, dtype=np.float32)
-    gy = np.linspace(0, dy * ny, ny, dtype=np.float32)
-    gz = np.linspace(0, dz * nz, nz, dtype=np.float32)
+    gx = np.linspace(0, dx * (nx-1), nx, dtype=np.float32)
+    gy = np.linspace(0, dy * (ny-1), ny, dtype=np.float32)
+    gz = np.linspace(0, dz * (nz-1), nz, dtype=np.float32)
     grid = [np.array([gx, gy, gz])]
     mask = sio.loadmat(mask_path)['mask']
 
-    assert cfg.data.n_training <= 0
+    # assert cfg.data.n_training <= 0
 
     n_cam = cfg.data.n_cam
     mean = cfg.data.mean
@@ -557,7 +784,8 @@ def get_real_world_airmspi_datasets(
         drop_index = cfg.data.drop_index,
         pixel_centers=pixel_centers_list,
         mask = mask,
-        grid = grid
+        grid = grid,
+        projection_list=projection_list
 
     )
 
@@ -614,8 +842,8 @@ class AirMSPIDataset(Dataset):
 
         return images, extinction, grid, images_mapping_list, pixel_centers, mask
 
-class AirMSPIDataset_test(Dataset):
-    def __init__(self, image_dir, n_cam, mapping, pixel_centers, mask_type=None, mean=0, std=1, dataset_name='',
+class AirMSPIDataset_ft(Dataset):
+    def __init__(self, image_dir, n_cam, mapping, pixel_centers, shdom_proj_lists, mask_type=None, mean=0, std=1, dataset_name='',
                  drop_index=-1, mask = None, grid = None):
         self.mapping = mapping
         self.image_dir = image_dir
@@ -628,14 +856,61 @@ class AirMSPIDataset_test(Dataset):
         self.drop_index = drop_index
         self.mask = mask
         self.grid =grid
+        self.shdom_proj_lists = shdom_proj_lists
+
+    def __len__(self):
+        return len(self.image_dir)
+
+    def __getitem__(self, idx):
+        images = sio.loadmat(self.image_dir[idx])['croped_airmspi_images']
+        if self.n_cam != 9:
+            images = np.delete(images, self.drop_index, 0)
+
+        if self.mask_type == 'space_carving':
+            mask = self.mask[idx]
+        else:
+            mask = np.ones_like(self.grid)>0
+        images -= self.mean
+        images /= self.std
+        # mapping = self.mapping[idx]
+        # pixel_centers = self.pixel_centers[idx]
+        # images_mapping_list = [[np.array(map) for map in mapping]]
+        # pixel_centers_list = [[np.array(centers) for centers in pixel_centers]]
+        images_mapping_list =  self.mapping[idx]# [np.array(map)[mask.ravel()] for map in]
+        pixel_centers_list = self.pixel_centers[idx] #[np.array(centers)[mask.ravel()] for centers in ]
+        shdom_proj_list = self.shdom_proj_lists[idx]
+        grid = self.grid[idx][0]
+        return images, grid, images_mapping_list, pixel_centers_list, mask, shdom_proj_list
+
+
+class AirMSPIDataset_test(Dataset):
+    def __init__(self, image_dir, n_cam, mapping, pixel_centers, mask_type=None, mean=0, std=1, dataset_name='',
+                 drop_index=-1, mask = None, grid = None,projection_list=None):
+        self.mapping = mapping
+        self.image_dir = image_dir
+        self.mask_type = mask_type
+        self.n_cam = n_cam
+        self.mean = mean
+        self.std = std
+        self.dataset_name = dataset_name
+        self.pixel_centers = pixel_centers
+        self.drop_index = drop_index
+        self.mask = mask
+        self.grid =grid
+        self.projection_list = projection_list
         if self.n_cam != 9 and self.drop_index>-1:
             self.mapping.pop(self.drop_index)
             self.pixel_centers = np.delete(self.pixel_centers,self.drop_index,0)
 
 
     def __getitem__(self, idx):
+        gt_image=None
         images = sio.loadmat(self.image_dir)['croped_airmspi_images']
         if self.n_cam != 9:
+            if self.projection_list is not None:
+                gt_image = images[self.drop_index][None]
+                gt_image -= self.mean
+                gt_image /= self.std
             images = np.delete(images, self.drop_index, 0)
         mask = None
         if self.mask_type == 'space_carving':
@@ -647,4 +922,4 @@ class AirMSPIDataset_test(Dataset):
         images_mapping_list = [[np.array(map) for map in self.mapping]]
         pixel_centers_list = [[np.array(centers) for centers in self.pixel_centers]]
 
-        return images, self.grid, images_mapping_list, pixel_centers_list, mask
+        return images, self.grid, images_mapping_list, pixel_centers_list, mask, gt_image,self.projection_list

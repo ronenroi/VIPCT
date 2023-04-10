@@ -281,8 +281,8 @@ class AirMSPICameras(TensorProperties):
         super().__init__(
             device=device,
         )
-        self.mapping = mapping
-        self.centers = centers
+        self.mapping = mapping.to(device=self.device)
+        self.centers = centers.to(device=self.device)
 
     def project_points(
         self, points, eps: Optional[float] = None, screen: bool = False
@@ -355,8 +355,8 @@ class AirMSPICameras(TensorProperties):
             pixel_centers = self.centers[:,:,points[0],:].to(device=self.device)
 
         else:
-            points_out = self.mapping
-            pixel_centers = self.centers
+            points_out = self.mapping.to(device=self.device)
+            pixel_centers = self.centers.to(device=self.device)
 
         return points_out, pixel_centers
 

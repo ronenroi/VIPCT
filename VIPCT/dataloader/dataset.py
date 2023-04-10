@@ -27,11 +27,11 @@ from torch.utils.data import Dataset
 import socket
 import random
 import scipy.io as sio
-
+from .noise import SatelliteNoise
 DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
 
-ALL_DATASETS = ("Toy_10cameras_20m","BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
+ALL_DATASETS = ("Toy_10cameras_20m","Toy2_10cameras_20m","BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
                 "BOMEX_10cameras_50m", "BOMEX_32cameras_20m", "BOMEX_32cameras_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
                 "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds",
@@ -135,6 +135,9 @@ def get_cloud_datasets(
     elif dataset_name == 'Toy_10cameras_20m':
         data_root = os.path.join(data_root, 'Toy', '10cameras_20m')
         image_size = [116, 116]
+    elif dataset_name == 'Toy2_10cameras_20m':
+        data_root = os.path.join(data_root, 'Toy2', '10cameras_20m')
+        image_size = [116, 116]
     else:
         FileNotFoundError()
 
@@ -153,6 +156,7 @@ def get_cloud_datasets(
     mean = cfg.data.mean
     std = cfg.data.std
     rand_cam = cfg.data.rand_cam
+
     train_dataset = CloudDataset(
             data_train_paths,
         n_cam=n_cam,
@@ -161,6 +165,7 @@ def get_cloud_datasets(
         mean=mean,
         std=std,
     dataset_name = dataset_name,
+        noise=cfg.data.noise
 
     )
     if not (dataset_name == 'BOMEX_CASS_10cameras_20m' or dataset_name == 'subset_of_seven_clouds'):
@@ -176,7 +181,9 @@ def get_cloud_datasets(
     val_len = cfg.data.n_val if cfg.data.n_val>0 else len(val_paths)
     val_paths = val_paths[:val_len]
     val_dataset = CloudDataset(val_paths, n_cam=n_cam,
-        rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name
+        rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name,
+        noise=cfg.data.noise
+
 )
 
     return train_dataset, val_dataset
@@ -184,7 +191,7 @@ def get_cloud_datasets(
 
 class CloudDataset(Dataset):
     def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name='',
-                 fix_grid=False):
+                 fix_grid=False, noise=False):
         self.cloud_dir = cloud_dir
         self.transform = transform
         self.target_transform = target_transform
@@ -195,7 +202,7 @@ class CloudDataset(Dataset):
         self.std = std
         self.dataset_name = dataset_name
         self.fix_grid = fix_grid
-
+        self.noise = SatelliteNoise() if noise else None
     def __len__(self):
         return len(self.cloud_dir)
 
@@ -222,6 +229,10 @@ class CloudDataset(Dataset):
         else:
             cam_i = torch.arange(self.n_cam)
         images = images[cam_i]
+
+        if self.noise is not None:
+            self.noise.convert_radiance_to_graylevel(images)
+
         images -= self.mean
         images /= self.std
 

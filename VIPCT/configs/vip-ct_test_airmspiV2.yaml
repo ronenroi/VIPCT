@@ -1,0 +1,27 @@
+hydra:
+  run:
+    dir: ../test_results/${now:%Y-%m-%d}_32N123W_experiment_cloud1_drop1_V2_0_0.5_50_ce_weight_zero0.1/${now:%H-%M-%S}
+seed: 3
+debug: False
+gpu: 1
+rerender: True
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-06_AirMSPI_BOMEX_aux_8cams_V1_drop_index1/19-44-22/checkpoints/cp_85000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-06_AirMSPI_BOMEX_aux_8cams_V2_drop_index1/19-46-15/checkpoints/cp_85000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-09_AirMSPI_BOMEX_aux_8cams_V2_drop_index1_0_0.5_50_ce_weight_zero0.1_BEST/15-00-39/checkpoints/cp_45000.pth'
+data:
+  dataset_name: '32N123W_experiment_cloud1'
+  n_val: -1
+
+ct_net:
+  val_n_query: 1000
+  val_mask_type: 'space_carving' # 'space_carving' 'gt_mask' None
+  query_point_val_method: 'all'
+  pred_type: 'max' #max
+  conf_type: 'prob' #conf_interval prob std rel_prob
+
+min_mask_points: 0
+
+shdom:
+  n_jobs: 35
+  use_forward_grid: True
+  add_rayleigh: True

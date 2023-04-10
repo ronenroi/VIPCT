@@ -34,3 +34,14 @@ def relative_mass_error(ext_est, ext_gt, eps=1e-6):
     rel_mass_error = (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
     return rel_mass_error
 
+def abs_error(ext_est, ext_gt):
+    assert len(ext_est.shape)<=3
+    assert len(ext_gt.shape)<=3
+    error = torch.mean(torch.abs(ext_est.view(-1) - ext_gt.view(-1)))
+    return error
+
+def relative_voxel_error(ext_est, ext_gt, eps=1):
+    assert len(ext_est.shape)<=3
+    assert len(ext_gt.shape)<=3
+    rel_error = torch.mean(torch.abs(ext_est.view(-1) - ext_gt.view(-1)) / (ext_gt.view(-1) + eps))
+    return rel_error

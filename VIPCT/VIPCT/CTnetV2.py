@@ -105,6 +105,11 @@ class CTnetV2(torch.nn.Module):
         n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / max_n_query))
         uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
         query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
+        pushbroom_camera = False
+        if len(embed_camera_center.shape) == 4:  # pushbroom camera
+            pushbroom_camera=True
+            embed_camera_center = torch.chunk(embed_camera_center, n_chunk, dim=1) if embed_camera_center is not None else None
+
         output = [torch.empty(0, device=image_features[0].device)] * len(n_query)
         for chunk in range(n_chunk):
             uv_chunk = [p[chunk] for p in uv]
@@ -120,16 +125,17 @@ class CTnetV2(torch.nn.Module):
                 #with torch.cuda.device(device=image_features[0].device):
    #                 torch.cuda.empty_cache()
             if embed_camera_center is not None:
-                embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,
-                                                                                    latent_chunk.shape[0],
-                                                                                    -1, -1)
-                embed_camera_center_chunk = embed_camera_center_chunk.reshape(latent_chunk.shape[0], -1)
+                if not pushbroom_camera:#perspective camera
+                    embed_camera_center_chunk = embed_camera_center.unsqueeze(1).expand(-1,latent_chunk.shape[0], -1, -1)
+                    embed_camera_center_chunk = embed_camera_center_chunk.reshape(latent_chunk.shape[0], -1)
+                else:
+                    embed_camera_center_chunk = embed_camera_center[chunk].reshape(latent_chunk.shape[0], -1)
                 latent_chunk = torch.cat((latent_chunk, embed_camera_center_chunk), -1)
 
             output_chunk = self.decoder(latent_chunk)
             del latent_chunk
-            with torch.cuda.device(device=image_features[0].device):
-                torch.cuda.empty_cache()
+            # with torch.cuda.device(device=image_features[0].device):
+            #     torch.cuda.empty_cache()
 
             output_chunk = torch.split(output_chunk, n_split)
             output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
@@ -216,14 +222,18 @@ class CTnetV2(torch.nn.Module):
             if self.query_point_method == 'toa_random':
                 volume, query_points, _ = volume.get_query_points_seq(self.n_query, self.query_point_val_method,                                                                   masks=masks)
             else:
+                # volume, query_points, _ = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
                 volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
         n_query = [points.shape[0] for points in query_points]
 
         if cameras.__class__.__name__ == "AirMSPICameras":
             pushbroom_camera = True
             uv, cam_centers = cameras.project_pointsv2(query_indices, screen=True)
+            # uv, cam_centers = cameras.project_pointsv2(None, screen=True)
             if self.mlp_cam_center:
                 embed_camera_center = self.mlp_cam_center(cam_centers.view(-1,3),cam_centers.view(-1,3)).view(*cam_centers.shape[:-1],-1)
+                embed_camera_center = embed_camera_center.transpose(1, 2)
+
             else:
                 embed_camera_center = None
 
@@ -257,7 +267,7 @@ class CTnetV2(torch.nn.Module):
 
             if embed_camera_center is not None:
                 if pushbroom_camera:
-                    embed_camera_center = embed_camera_center.squeeze(0).transpose(0, 1)
+                    embed_camera_center = embed_camera_center.squeeze(0)
                     embed_camera_center = embed_camera_center.reshape(embed_camera_center.shape[0],-1)
                 else:
                     embed_camera_center = embed_camera_center.reshape(embed_camera_center.shape[0],-1)

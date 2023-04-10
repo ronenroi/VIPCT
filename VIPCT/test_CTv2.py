@@ -105,6 +105,8 @@ def main(cfg: DictConfig):
     relative_err = []
     l2_err = []
     relative_mass_err = []
+    abs_err = []
+    relative_voxel_err = []
     batch_time_net = []
     confidence_list = []
     est_list = []
@@ -140,8 +142,9 @@ def main(cfg: DictConfig):
                     val_volume,
                     masks
                 )
-                if cfg.version == 'V2':
-                    val_out["output"], val_out["output_conf"] = get_pred_and_conf_from_discrete(val_out["output"],
+                if cfg.optimizer.loss == 'CE':
+
+                    val_out["output"], val_out["output_conf"], probs = get_pred_and_conf_from_discrete(val_out["output"],
                                                                                                 cfg.cross_entropy.min,
                                                                                                 cfg.cross_entropy.max,
                                                                                                 cfg.cross_entropy.bins,
@@ -149,6 +152,7 @@ def main(cfg: DictConfig):
                                                                                                 conf_type=cfg.ct_net.conf_type)
                 else:
                     val_out["output_conf"] = None
+                    probs = None
                 if val_out['query_indices'] is None:
                     for i, (out_vol, m) in enumerate(zip(val_out["output"],masks)):
                         if m is None:
@@ -182,9 +186,12 @@ def main(cfg: DictConfig):
                         else:
                             if len(out_vol.squeeze().shape)==1:
                                 est_vol[m] = out_vol.reshape(-1)
-                                conf_vol = torch.ones_like(est_vol) * torch.nan
                                 if val_out["output_conf"] is not None:
+                                    conf_vol = torch.ones_like(est_vol) * torch.nan
+                                    prob_vol = torch.ones(est_vol.numel(), probs[0].shape[-1],
+                                                          device=est_vol.device) * torch.nan
                                     conf_vol[m] = val_out["output_conf"][0]
+                                    prob_vol[m] = probs[0]
                             else: # value, std
                                 #not supported anymore
                                 assert False
@@ -202,12 +209,14 @@ def main(cfg: DictConfig):
             if val_out["output_conf"] is not None:
 
                 conf_vol = conf_vol.squeeze().reshape(gt_vol.shape)
+                prob_vol = prob_vol.reshape(*gt_vol.shape,-1)
             else:
                 conf_vol = torch.empty(1)
+                prob_vol = torch.empty(1)
             masks[0] = masks[0].squeeze().reshape(gt_vol.shape)
             est_vols[est_vols<0] = 0
 
-            print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, L2 = {relative_squared_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
+            print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, abs_error = {abs_error(ext_est=est_vols,ext_gt=gt_vol)}, relative_voxel_error = {relative_voxel_error(ext_est=est_vols,ext_gt=gt_vol)}  L2 = {relative_squared_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
             if False:
                 xv, yv, zv = np.meshgrid(np.linspace(0, gt_vol.shape[0],
                                                      gt_vol.shape[0]),np.linspace(0, gt_vol.shape[1], gt_vol.shape[1]),
@@ -223,16 +232,48 @@ def main(cfg: DictConfig):
                 plt.xlabel('|gt-est|')
                 plt.ylabel('confidence')
                 plt.show()
+
+
+                if 0: #toy
+                    x0, y0, z0 = (0.8, 0.8, 1.28)
+                    x, y, z = np.meshgrid(np.linspace(0,31*0.05,32),np.linspace(0,31*0.05,32), np.linspace(0,63*0.04,64))
+                    r = np.sqrt((x - x0) ** 2 + (y - y0) ** 2 + (z - z0) ** 2)
+                    nx=ny=32
+                    nz=64
+                    mu = -1
+                    sigma = 0.25
+                    cloud_in = np.zeros((nx, ny, nz))
+                    cloud_in[r <= 0.06] = 1
+                    gt_vol_in = gt_vol[cloud_in==1]
+                    est_vol_in = est_vols[cloud_in==1]
+                    conf_vol_in = conf_vol[cloud_in==1]
+
+                    cloud_mid = np.zeros((nx, ny, nz))
+                    cloud_mid[(r > 0.06) * (r < 0.5)] = 1
+                    gt_vol_mid = gt_vol[cloud_mid==1]
+                    est_vol_mid = est_vols[cloud_mid==1]
+                    conf_vol_mid = conf_vol[cloud_mid==1]
+
+                    cloud_out = np.zeros((nx, ny, nz))
+                    cloud_out[(r >= 0.5) * (r < 0.6)] = 1
+                    gt_vol_out = gt_vol[cloud_out==1]
+                    est_vol_out = est_vols[cloud_out==1]
+                    conf_vol_out = conf_vol[cloud_out==1]
+
+                    sio.savemat('mask_toy_cloud2.mat',{'cloud_in':cloud_in,'cloud_mid':cloud_mid,'cloud_out':cloud_out})
+
             if cfg.save_results:
                 val_image *= cfg.data.std
                 val_image += cfg.data.mean
                 sio.savemat(f'results_cloud_{val_i}.mat',{'gt':gt_vol.detach().cpu().numpy(),'est':est_vols.detach().cpu().numpy(),
-                                                          'images': val_image.detach().cpu().numpy(),'conf':conf_vol.cpu().numpy()})
+                                                          'probs':prob_vol.cpu().numpy()})# 'images': val_image.detach().cpu().numpy(),
 
             # aggregate error statistics
             relative_err.append(relative_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             l2_err.append(relative_squared_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             relative_mass_err.append(relative_mass_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
+            abs_err.append(abs_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
+            relative_voxel_err.append(relative_voxel_error(ext_est=est_vols,ext_gt=gt_vol).detach().cpu().numpy())
             confidence_list.append(conf_vol.cpu().numpy())
             est_list.append(est_vols.cpu().numpy())
             gt_list.append(gt_vol.cpu().numpy())
@@ -254,6 +295,8 @@ def main(cfg: DictConfig):
     relative_err = np.array(relative_err)
     relative_mass_err =np.array(relative_mass_err)
     l2_err = np.array(l2_err)
+    abs_err = np.array(abs_err)
+    relative_voxel_err = np.array(relative_voxel_err)
     confidence_list= np.array(confidence_list)
     est_list= np.array(est_list)
     gt_list= np.array(gt_list)
@@ -273,6 +316,8 @@ def main(cfg: DictConfig):
     print(f'mean relative error {np.mean(relative_err)} with std of {np.std(relative_err)} for {(val_i + 1)} clouds')
     print(f'mean relative mass error {np.mean(relative_mass_err)} with std of {np.std(relative_mass_err)} for {(val_i + 1)} clouds')
     print(f'mean L2 error {np.mean(l2_err)} with std of {np.std(l2_err)} for {(val_i + 1)} clouds')
+    print(f'mean abs error {np.mean(abs_err)} with std of {np.std(abs_err)} for {(val_i + 1)} clouds')
+    print(f'mean relative voxel error {np.mean(relative_voxel_err)} with std of {np.std(relative_voxel_err)} for {(val_i + 1)} clouds')
     # print(f'Weighted relative error {np.mean(weighted_relative_err)} with std of {np.std(weighted_relative_err)} for {(val_i + 1)} clouds')
 
     print(f'Mean time = {np.mean(batch_time_net)} +- {np.std(batch_time_net)}')

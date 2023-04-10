@@ -177,6 +177,9 @@ def main(cfg: DictConfig):
                 param.requires_grad = True
             else:
                 param.requires_grad = False
+        model._image_encoder.eval()
+        model.mlp_cam_center.eval()
+        model.mlp_xyz.eval()
     # for name, param in model.named_parameters():
     #     if param.requires_grad:
     #         print(name)
@@ -217,11 +220,11 @@ def main(cfg: DictConfig):
                 volume,
                 masks
             )
-            if cfg.version == 'V1':
+            if out["output"][0].shape[-1]==1:
                 conf_vol = None
                 mask_conf = masks[0]
             else:
-                out["output"], out["output_conf"] = get_pred_and_conf_from_discrete(out["output"],
+                out["output"], out["output_conf"], probs = get_pred_and_conf_from_discrete(out["output"],
                                                                                     cfg.cross_entropy.min,
                                                                                     cfg.cross_entropy.max,
                                                                                     cfg.cross_entropy.bins,
@@ -299,11 +302,12 @@ def main(cfg: DictConfig):
                         writer.monitor_scatter_plot(out["output"][ind], out["volume"][ind],ind=ind)
                         writer.monitor_images(diff_renderer_shdom.gt_images,np.array(diff_renderer_shdom.images))
 
-            del images
-            with torch.cuda.device(device=device):
-                torch.cuda.empty_cache()
+
+            # with torch.cuda.device(device=device):
+            #     torch.cuda.empty_cache()
             # Validation
             if iteration % cfg.validation_iter_interval == 0 and iteration > 0:
+                del images
                 loss_val = 0
                 relative_err= 0
                 relative_mass_err = 0
@@ -331,7 +335,7 @@ def main(cfg: DictConfig):
                             val_volume,
                             masks
                         )
-                        if cfg.version == 'V2':
+                        if val_out["output"][0].shape[-1] > 1:
                             val_out["output"] = get_pred_from_discrete(val_out["output"], cfg.cross_entropy.min,
                                                               cfg.cross_entropy.max, cfg.cross_entropy.bins)
 
@@ -372,6 +376,7 @@ def main(cfg: DictConfig):
                 loss_val /= (val_i + 1)
                 relative_err /= (val_i + 1)
                 relative_mass_err /= (val_i+1)
+                print(f'[val] | epoch {epoch} | it {iteration} |  loss: {loss_val} | relative_err: {relative_err} |relative_mass_err: {relative_mass_err}')
                 stats.update({"loss": float(loss_val), "relative_error": float(relative_err)}, stat_set="val")
 
                 if writer:
@@ -384,8 +389,8 @@ def main(cfg: DictConfig):
                 stats.print(stat_set="val")
                 # Set the model back to train mode.
                 del val_camera, val_image, val_volume, masks
-                with torch.cuda.device(device=device):
-                    torch.cuda.empty_cache()
+                # with torch.cuda.device(device=device):
+                #     torch.cuda.empty_cache()
                 model.train()
 
                 # Checkpoint.

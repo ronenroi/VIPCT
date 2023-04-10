@@ -32,12 +32,14 @@ def to_discrete(gt, min, max, bins):
 
 def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='max', conf_type='prob'):
     preds = []
+    probs = []
     confidences = []
     for discrete_pred in discrete_preds:
         # i_max = discrete_pred.argmax(-1)
         prob = torch.exp(discrete_pred) / torch.exp(discrete_pred).sum(-1)[..., None]
         i_max = prob.argmax(-1)
         bin_values = torch.linspace(min, max, bins, device=discrete_pred.device)
+        delta = (max - min) / (bins - 1)
 
         if pred_type == 'max':
             # scores = torch.exp(discrete_pred)
@@ -66,7 +68,7 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             weights = prob**10
             weights /= weights.sum(-1)[...,None]
             weighted_bins = weights * bin_values
-            pred = weighted_bins.sum(-1) # discrete_pred.sum(-1) should be 1
+            pred = weighted_bins.sum(-1) * delta # discrete_pred.sum(-1) should be 1
             pred[torch.isnan(pred)] = 0
         else:
             NotImplementedError()
@@ -176,9 +178,10 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
 
 
         preds.append(pred)
+        probs.append(prob)
         confidences.append(confidence)
 
-    return preds, confidences
+    return preds, confidences, probs
 
 
 

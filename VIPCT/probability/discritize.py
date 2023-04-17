@@ -70,6 +70,13 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             weighted_bins = weights * bin_values
             pred = weighted_bins.sum(-1) * delta # discrete_pred.sum(-1) should be 1
             pred[torch.isnan(pred)] = 0
+        elif pred_type == 'differentiable_max_correct':
+            # prob[:,0] /= 100
+            weights = prob**10
+            weights /= weights.sum(-1)[...,None]
+            weighted_bins = weights * bin_values
+            pred = weighted_bins.sum(-1)  # discrete_pred.sum(-1) should be 1
+            pred[torch.isnan(pred)] = 0
         else:
             NotImplementedError()
         if conf_type=='prob':

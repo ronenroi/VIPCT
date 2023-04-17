@@ -142,7 +142,7 @@ def main(cfg: DictConfig):
                     val_volume,
                     masks
                 )
-                if cfg.optimizer.loss == 'CE':
+                if val_out["output"][0].shape[-1]>1:
 
                     val_out["output"], val_out["output_conf"], probs = get_pred_and_conf_from_discrete(val_out["output"],
                                                                                                 cfg.cross_entropy.min,

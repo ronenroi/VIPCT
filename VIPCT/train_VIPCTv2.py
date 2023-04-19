@@ -301,7 +301,7 @@ def main(cfg: DictConfig):
                     if torch.sum(torch.tensor([(mask).sum() if mask is not None else mask for mask in masks])) == 0:
                         continue
                 # Activate eval mode of the model (lets us do a full rendering pass).
-                    model.eval()
+                #     model.eval()
                     with torch.no_grad():
                         val_out = model(
                             val_camera,

@@ -95,7 +95,10 @@ def main(cfg: DictConfig):
     )
 
     # Set the model to eval mode.
-    model.eval().float()
+    if cfg.mode == 'eval':
+        model.eval().float()
+    else:
+        model.float()
 
     iteration = -1
     if writer:
@@ -216,7 +219,7 @@ def main(cfg: DictConfig):
             masks[0] = masks[0].squeeze().reshape(gt_vol.shape)
             est_vols[est_vols<0] = 0
 
-            print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, abs_error = {abs_error(ext_est=est_vols,ext_gt=gt_vol)}, relative_voxel_error = {relative_voxel_error(ext_est=est_vols,ext_gt=gt_vol)}  L2 = {relative_squared_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
+            print(f'epsilon = {relative_error(ext_est=est_vols,ext_gt=gt_vol)}, relative_mass_error = {relative_mass_error(ext_est=est_vols,ext_gt=gt_vol)}, relative_voxel_error = {relative_voxel_error(ext_est=est_vols,ext_gt=gt_vol)}  L2 = {relative_squared_error(ext_est=est_vols,ext_gt=gt_vol)}, Npoints = {n_points_mask}')
             if False:
                 xv, yv, zv = np.meshgrid(np.linspace(0, gt_vol.shape[0],
                                                      gt_vol.shape[0]),np.linspace(0, gt_vol.shape[1], gt_vol.shape[1]),

@@ -1,20 +1,21 @@
 hydra:
   run:
-    dir: ../test_results/${now:%Y-%m-%d}_BOMEX_50CCN_BOMEX_500CCN_noise_V2_FT/${now:%H-%M-%S}
+    dir: ../test_results/${now:%Y-%m-%d}_BOMEX_500CCN_V2_all/${now:%H-%M-%S}
 seed: 0
 debug: False
-gpu: 3
+gpu: 0
 save_results: False
 show: False
+mode: train
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-02-26_VIPCTv2_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_CE_300bins_LR5.0e-05_Gcam_64_Gdomain_64_maskSC/16-46-37/checkpoints/cp_165000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_V1_noise/14-16-49/checkpoints/cp_230000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-10_FT_BOMEX50CCN_BOMEX_50CCN_10cameras_20m_V1_LR5.0e-06_EVALadded/20-48-35/checkpoints/cp_50.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-06_FT_BOMEX_50CCN_10cameras_20m_V2_LR5.0e-06/20-25-06/checkpoints/cp_900.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_V1_noise/14-16-49/checkpoints/cp_230000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-03-25_FT_BOMEX_50CCN_10cameras_20m_trainset_all_sc_mask_differentiable_maxV2/21-43-43/checkpoints/cp_350.pth'
 data:
-#  dataset_name: 'BOMEX_10cameras_20m'
+  dataset_name: 'BOMEX_10cameras_20m'
 #  dataset_name: 'Toy2_10cameras_20m'
-  dataset_name: 'BOMEX_50CCN_10cameras_20m'
+#  dataset_name: 'BOMEX_50CCN_10cameras_20m'
 #  dataset_name: 'CASS_600CCN_roiprocess_10cameras_20m'
 #  dataset_name: 'HAWAII_2000CCN_10cameras_20m'
 #  dataset_name: 'DYCOMS_RF02_500CCN_10cameras_20m'
@@ -29,6 +30,8 @@ ct_net:
   query_point_val_method: 'all'
   pred_type: 'differentiable_max_correct' #max
   conf_type: 'prob' #conf_interval prob std rel_prob
+  decoder_batchify: True
+
 min_mask_points: 0 # 30 for CASS_10cams_50m
 decoder:
   type: 'mlp' #mlp transformer

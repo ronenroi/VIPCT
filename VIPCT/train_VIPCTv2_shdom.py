@@ -96,7 +96,7 @@ def main(cfg: DictConfig):
     log_dir = os.getcwd()
     writer = SummaryWriter(log_dir)
     checkpoint_dir = os.path.join(log_dir, 'checkpoints')
-    checkpoint_resume_path =  os.path.join(hydra.utils.get_original_cwd(), cfg.checkpoint_resume_path)
+    checkpoint_resume_path = os.path.join(hydra.utils.get_original_cwd(), cfg.checkpoint_resume_path)
     if len(checkpoint_dir) > 0:
         # Make the root of the experiment directory.
         # checkpoint_dir = os.path.split(checkpoint_path)
@@ -177,9 +177,10 @@ def main(cfg: DictConfig):
                 param.requires_grad = True
             else:
                 param.requires_grad = False
-        model._image_encoder.eval()
-        model.mlp_cam_center.eval()
-        model.mlp_xyz.eval()
+        if cfg.ct_net.encoder_mode == 'eval':
+            model._image_encoder.eval()
+            model.mlp_cam_center.eval()
+            model.mlp_xyz.eval()
     # for name, param in model.named_parameters():
     #     if param.requires_grad:
     #         print(name)
@@ -239,9 +240,9 @@ def main(cfg: DictConfig):
             est_vol[out['query_indices'][0]] = out["output"][0].squeeze()
             est_vol = est_vol.reshape(volume.extinctions.shape[2:])
 
-            if mask_conf.sum()>5000:
-                print('skip')
-                continue
+            # if mask_conf.sum()>5000:
+            #     print('skip')
+            #     continue
             print(mask_conf.sum())
             images = images.cpu().numpy()
             # print(est_vol[extinction[0]>0].mean().item())
@@ -274,8 +275,17 @@ def main(cfg: DictConfig):
             # Take the training step.
             iteration += 1
             loss.backward()
-            optimizer.step()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.optimizer.clip)
 
+            skip=False
+            for param in model.decoder.parameters():
+                if param.requires_grad and not torch.all(torch.isfinite(param.grad)):
+                    print("invalid gradients")
+                    skip = True
+                    continue
+            if skip:
+                continue
+            optimizer.step()
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
             with torch.no_grad():
 
@@ -283,7 +293,6 @@ def main(cfg: DictConfig):
                 relative_err = torch.tensor(relative_err).mean()
                 relative_mass_err = [relative_mass_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]#(torch.norm(out["output"],p=1,dim=-1) - torch.norm(out["volume"],p=1,dim=-1)) / (torch.norm(out["volume"],p=1,dim=-1) + 1e-6)
                 relative_mass_err = torch.tensor(relative_mass_err).mean()
-
             # Update stats with the current metrics.
             stats.update(
                 {"loss": float(loss), "relative_error": float(relative_err), "lr":  lr_scheduler.get_last_lr()[0],#optimizer.param_groups[0]['lr'],#lr_scheduler.get_last_lr()[0]
@@ -302,11 +311,12 @@ def main(cfg: DictConfig):
                         writer.monitor_scatter_plot(out["output"][ind], out["volume"][ind],ind=ind)
                         writer.monitor_images(diff_renderer_shdom.gt_images,np.array(diff_renderer_shdom.images))
 
-
             # with torch.cuda.device(device=device):
             #     torch.cuda.empty_cache()
             # Validation
+            # for mode in range(2)
             if iteration % cfg.validation_iter_interval == 0 and iteration > 0:
+                optimizer.zero_grad()
                 del images
                 loss_val = 0
                 relative_err= 0
@@ -327,7 +337,7 @@ def main(cfg: DictConfig):
                     if torch.sum(torch.tensor([(mask).sum() if mask is not None else mask for mask in masks])) == 0:
                         continue
                 # Activate eval mode of the model (lets us do a full rendering pass).
-                    model.eval()
+                #     model.eval()
                     with torch.no_grad():
                         val_out = model(
                             val_camera,
@@ -391,7 +401,7 @@ def main(cfg: DictConfig):
                 del val_camera, val_image, val_volume, masks
                 # with torch.cuda.device(device=device):
                 #     torch.cuda.empty_cache()
-                model.train()
+                # model.decoder.train()
 
                 # Checkpoint.
             if (

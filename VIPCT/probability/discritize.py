@@ -36,7 +36,11 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
     confidences = []
     for discrete_pred in discrete_preds:
         # i_max = discrete_pred.argmax(-1)
-        prob = torch.exp(discrete_pred) / torch.exp(discrete_pred).sum(-1)[..., None]
+        discrete_pred = discrete_pred.double()
+        with torch.no_grad():
+            d = discrete_pred.mean(-1)[...,None]
+            discrete_pred -= d
+        prob = torch.exp(discrete_pred) / (torch.exp(discrete_pred).sum(-1)[..., None] + 1e-20)
         i_max = prob.argmax(-1)
         bin_values = torch.linspace(min, max, bins, device=discrete_pred.device)
         delta = (max - min) / (bins - 1)
@@ -66,7 +70,11 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
         elif pred_type == 'differentiable_max':
             # prob[:,0] /= 100
             weights = prob**10
-            weights /= weights.sum(-1)[...,None]
+            with torch.no_grad():
+                d = weights.sum(-1)[...,None]
+            weights /= d
+            if torch.isnan(weights.max()):
+                print('weight nan')
             weighted_bins = weights * bin_values
             pred = weighted_bins.sum(-1) * delta # discrete_pred.sum(-1) should be 1
             pred[torch.isnan(pred)] = 0
@@ -184,9 +192,9 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
 
 
 
-        preds.append(pred)
-        probs.append(prob)
-        confidences.append(confidence)
+        preds.append(pred.float())
+        probs.append(prob.float())
+        confidences.append(confidence.float())
 
     return preds, confidences, probs
 

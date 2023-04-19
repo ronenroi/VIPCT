@@ -64,9 +64,14 @@ def resnet_fpn_backbone(
             a new list of feature maps and their corresponding names. By
             default a ``LastLevelMaxPool`` is used.
     """
+    d = backbone_name.split('resnet')[-1]
     backbone = resnet.__dict__[backbone_name](
-        pretrained=pretrained,
+        weights=f'ResNet{d}_Weights.IMAGENET1K_V1' if pretrained else None,
         norm_layer=norm_layer)
+
+    # backbone = resnet.__dict__[backbone_name](
+    #     pretrained=pretrained,
+    #     norm_layer=norm_layer)
 
     # select layers that wont be frozen
     assert 0 <= trainable_layers <= 5

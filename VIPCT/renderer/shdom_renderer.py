@@ -397,7 +397,7 @@ class DiffRendererSHDOM(object):
         # axarr[1].imshow(images[5], vmin=0, vmax=vmax)
         # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
         # plt.show()
-        #
+
         # plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
         # plt.axis('square')
         # plt.show()
@@ -411,6 +411,7 @@ class DiffRendererSHDOM(object):
         #     ax[0].axis('off')
         #     ax[1].axis('off')
         #     ax[2].axis('off')
+        # plt.title(f'loss={loss}')
         # plt.tight_layout()
         # plt.show()
 

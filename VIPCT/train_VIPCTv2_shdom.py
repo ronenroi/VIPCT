@@ -230,7 +230,8 @@ def main(cfg: DictConfig):
                                                                                     cfg.cross_entropy.max,
                                                                                     cfg.cross_entropy.bins,
                                                                                     pred_type=cfg.ct_net.pred_type,
-                                                                                    conf_type=cfg.ct_net.conf_type)
+                                                                                    conf_type=cfg.ct_net.conf_type,
+                                                                                    prob_gain=cfg.ct_net.prob_gain)
                 conf_vol = torch.zeros(volume.extinctions.numel(), device=volume.device)
                 conf_vol[out['query_indices'][0]] = out["output_conf"][0]
                 conf_vol = conf_vol.reshape(volume.extinctions.shape[2:]).to(device=masks[0].device)
@@ -272,19 +273,22 @@ def main(cfg: DictConfig):
             # loss = torch.mean(torch.stack(loss))
             # loss = torch.tensor(loss).mean()
 
-            # Take the training step.
-            iteration += 1
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.optimizer.clip)
 
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.optimizer.clip)
+            if cfg.optimizer.loss_thr<loss:
+                print("Images are too inconsistent, skip gradient update for stability")
+                continue
+            loss.backward()
             skip=False
             for param in model.decoder.parameters():
                 if param.requires_grad and not torch.all(torch.isfinite(param.grad)):
-                    print("invalid gradients")
                     skip = True
                     continue
             if skip:
+                print("invalid gradients")
                 continue
+            # Take the training step.
+            iteration += 1
             optimizer.step()
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
             with torch.no_grad():

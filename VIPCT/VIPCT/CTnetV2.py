@@ -51,6 +51,7 @@ class CTnetV2(torch.nn.Module):
         self.decoder_input_size = self._image_encoder.latent_size* n_cam
         self.ce_bins = cfg.cross_entropy.bins
         self.iter = 0
+        self.train_mode = True
         if n_layers_xyz>0:
             if n_layers_xyz>1:
                 self.mlp_xyz = MLPWithInputSkips(
@@ -87,7 +88,7 @@ class CTnetV2(torch.nn.Module):
         elif cfg.decoder.type == 'transformer':
             self.decoder = VipctTransformer.from_cfg(cfg, self.decoder_input_size, self.ce_bins)
             self.decoder_type = 'transformer'
-            self.training_seq_iter = cfg.transformer.training_seq_iter
+            self.train_mode_seq_iter = cfg.transformer.training_seq_iter
         else:
             NotImplementedError()
 
@@ -101,7 +102,7 @@ class CTnetV2(torch.nn.Module):
 
     def batchify_mlp(self, image_features, embed_camera_center, query_points, uv, n_query):
         assert self.decoder_type == 'mlp'
-        max_n_query = self.n_query if self.training else self.val_n_query
+        max_n_query = self.n_query if self.train_mode else self.val_n_query
         n_chunk = int(torch.ceil(torch.tensor(n_query).sum() / max_n_query))
         uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
         query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
@@ -146,7 +147,7 @@ class CTnetV2(torch.nn.Module):
         n_query_z = int(torch.tensor(n_query).sum() / z_size)
         query_points = query_points.reshape(n_query_z,z_size,-1)
         uv = [p.reshape(-1,n_query_z,z_size,2) for p in uv]
-        max_n_query = self.n_query if self.training else self.val_n_query
+        max_n_query = self.n_query if self.train_mode else self.val_n_query
         n_chunk = int(torch.ceil(torch.tensor(n_query_z / max_n_query)))
         uv = [torch.chunk(p, n_chunk, dim=1) for p in uv]
         query_points = torch.chunk(query_points, n_chunk) if query_points is not None else None
@@ -211,7 +212,7 @@ class CTnetV2(torch.nn.Module):
         #with torch.cuda.device(device=image_features[0].device):
           #  torch.cuda.empty_cache()
 
-        if self.training and not self.decoder_batchify:
+        if self.train_mode and not self.decoder_batchify:
             if self.use_neighbours:
                 volume, query_points, query_indices = volume.get_query_points_and_neighbours(self.n_query, self.query_point_method, masks=masks)
             elif self.query_point_method == 'toa_random' or self.query_point_method == 'toa_all':
@@ -255,7 +256,7 @@ class CTnetV2(torch.nn.Module):
         else:
             query_points = None
 
-        if self.training and not self.decoder_batchify:
+        if self.train_mode and not self.decoder_batchify:
             latent = self._image_encoder.sample_roi(image_features, uv)#.transpose(1, 2)
             latent = torch.vstack(latent).transpose(0, 1)
             if query_points is not None:
@@ -282,7 +283,7 @@ class CTnetV2(torch.nn.Module):
                 output = self.decoder(latent)
             elif self.decoder_type == 'transformer':
                 latent = latent.reshape(int(n_query[0]/32),32,-1)
-                if self.training_seq_iter<self.iter:
+                if self.train_mode_seq_iter<self.iter:
                     seq = volume[0].reshape(int(n_query[0]/32),32)
                     seq = torch.round(seq)
                     seq[seq>300] =300

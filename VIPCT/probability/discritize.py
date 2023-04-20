@@ -30,7 +30,7 @@ def to_discrete(gt, min, max, bins):
     index[index>(bins-1)] = bins-1
     return index
 
-def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='max', conf_type='prob'):
+def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='max', conf_type='prob',prob_gain=10):
     preds = []
     probs = []
     confidences = []
@@ -69,9 +69,9 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             # pred = torch.vstack((pred,pred_std)).T
         elif pred_type == 'differentiable_max':
             # prob[:,0] /= 100
-            weights = prob**10
-            with torch.no_grad():
-                d = weights.sum(-1)[...,None]
+            weights = prob**prob_gain
+            # with torch.no_grad():
+            d = weights.sum(-1)[...,None]
             weights /= d
             if torch.isnan(weights.max()):
                 print('weight nan')
@@ -80,7 +80,7 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             pred[torch.isnan(pred)] = 0
         elif pred_type == 'differentiable_max_correct':
             # prob[:,0] /= 100
-            weights = prob**10
+            weights = prob**prob_gain
             weights /= weights.sum(-1)[...,None]
             weighted_bins = weights * bin_values
             pred = weighted_bins.sum(-1)  # discrete_pred.sum(-1) should be 1

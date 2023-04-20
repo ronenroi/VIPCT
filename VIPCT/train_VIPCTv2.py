@@ -282,6 +282,7 @@ def main(cfg: DictConfig):
 
             # Validation
             if iteration % cfg.validation_iter_interval == 0 and iteration > 0:
+                model.train_mode = False
                 loss_val = 0
                 relative_err= 0
                 relative_mass_err = 0
@@ -346,11 +347,12 @@ def main(cfg: DictConfig):
                             if val_i in val_scatter_ind:
                                 writer.monitor_scatter_plot(est_vols, gt_vol,ind=val_i)
                     # Update stats with the validation metrics.
-                    stats.update({"loss": float(loss_val), "relative_error": float(relative_err)}, stat_set="val")
 
                 loss_val /= (val_i + 1)
                 relative_err /= (val_i + 1)
                 relative_mass_err /= (val_i+1)
+                stats.update({"loss": float(loss_val), "relative_error": float(relative_err)}, stat_set="val")
+                stats.print(stat_set="val")
 
                 if writer:
                     writer._iter = iteration
@@ -359,12 +361,12 @@ def main(cfg: DictConfig):
                     writer.monitor_scatterer_error(relative_mass_err, relative_err)
                     # writer.monitor_images(val_image)
 
-                stats.print(stat_set="val")
 
 
 
                 # Set the model back to train mode.
-                model.train()
+                # model.train()
+                model.train_mode = True
 
                 # Checkpoint.
             if (

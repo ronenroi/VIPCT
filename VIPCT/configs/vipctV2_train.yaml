@@ -38,7 +38,7 @@ optimizer:
   batch_size: 1
   iter_steps: [1000000000]
   lr_scheduler_gamma: 0.1
-  loss: 'L2_relative_error' #'L2_relative_error' # 'CE'
+  loss: 'CE' #'L2_relative_error' # 'CE'
   ce_weight_zero: True
 cross_entropy:
   min: 0
@@ -77,7 +77,7 @@ backbone:
   modify_first_layer: True
 
 decoder:
-  name: 'FixCTv4' #'CE' #FixCTv4_CE
+  name: 'FixCTv4_CE' #'CE' #FixCTv4_CE
   type: 'mlp' #mlp transformer
   masked: False
   num_masked: 20

@@ -1,24 +1,24 @@
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_FT_BOMEX500_Train=BOMEX50_v2_mode_train_lr5.0e-05_gain_10_cloud10/${now:%H-%M-%S}
-#    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
+#    dir: ../outputs/${now:%Y-%m-%d}_FT_HAWAII_2000CCN_Train=bomex500_v2_mode_train_lr5.0e-05_monoton_phase/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 0
 debug: False
 resume: True
 
 version: 'V2'
-stats_print_interval: 10
-validation_iter_interval: 10
-checkpoint_iteration_interval: 25
+stats_print_interval: 5
+validation_iter_interval: 5
+checkpoint_iteration_interval: 5
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_V1_noise/14-16-49/checkpoints/cp_230000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_50CCN_10cameras_20m_V1_noise/14-15-58/checkpoints/cp_225000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
-#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_CE_noise/14-14-03/checkpoints/cp_230000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_50CCN_10cameras_20m_CE_noise/14-15-26/checkpoints/cp_230000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-23_Train_Hawaii2000_10cameras_20m_V1_noise/15-02-48/checkpoints/cp_145000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_CE_noise/14-14-03/checkpoints/cp_230000.pth'
 gpu: 2
 data:
-  dataset_name: 'BOMEX_10cameras_20m' #'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
-  n_training: 10
+  dataset_name: 'BOMEX_50CCN_10cameras_20m' #'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
+  n_training: -1
   n_val: 30
   n_cam: 10
   rand_cam: False

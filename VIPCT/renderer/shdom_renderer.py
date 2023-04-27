@@ -459,7 +459,7 @@ class DiffRendererSHDOM_Airmspi(object):
         parser = argparse.ArgumentParser()
         # CloudGenerator = getattr(shdom.generate, 'Homogenous')
         CloudGenerator = Monotonous
-        CloudGenerator = shdom.Generate.Homogeneous
+        # CloudGenerator = shdom.Generate.Homogeneous
         parser = CloudGenerator.update_parser(parser)
 
         AirGenerator = None

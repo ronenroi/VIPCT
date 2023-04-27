@@ -2,11 +2,139 @@ import os, time
 import numpy as np
 import argparse
 import at3d
+import shdom
 import dill as pickle
 import torch
 from VIPCT.renderer.shdom_util import Monotonous
 import matplotlib.pyplot as plt
+import xarray as xr
+from collections import OrderedDict
 
+def perspective_projection(wavelength, fov, x_resolution, y_resolution,
+                           position_vector, rotation_matrix,
+                           stokes='I'):
+    """
+    Generates a sensor dataset that observes a target location with
+    a perspective (pinhole camera) projection.
+
+    Parameters
+    ----------
+    wavelength: float,
+        Wavelength in [micron]
+    fov: float
+        Field of view [deg]
+    x_resolution: int
+        Number of pixels in camera x axis
+    y_resolution: int
+        Number of pixels in camera y axis
+    position_vector: list of 3 float elements
+        [x , y , z] which are:
+        Location in global x coordinates [km] (North)
+        Location in global y coordinates [km] (East)
+        Location in global z coordinates [km] (Up)
+    lookat_vector: list of 3 float elements
+        [x , y , z] which are:
+        Point in global x coordinates [km] (North) where the camera is pointing at
+        Point in global y coordinates [km] (East) where the camera is pointing at
+        Point in global z coordinates [km] (Up) where the camera is pointing at
+    up_vector: list of 3 float elements
+        The up vector determines the roll of the camera.
+    stokes: list or string
+       list or string of stokes components to observe ['I', 'Q', 'U', 'V'].
+    sub_pixel_ray_args : dict
+        dictionary defining the method for generating sub-pixel rays. The callable
+        which generates the position_perturbations and weights (e.g. at3d.sensor.gaussian)
+        should be set as the 'method', while arguments to that callable, should be set as
+        other entries in the dict. Each argument have two values, one for each of the
+        x and y axes of the image plane, respectively.
+        E.g. sub_pixel_ray_args={'method':at3d.sensor.gaussian, 'degree': (2, 3)}
+
+    Returns
+    -------
+    sensor : xr.Dataset
+        A dataset containing all of the information required to define a sensor
+        for which synthetic measurements can be simulated;
+        positions and angles of all pixels, sub-pixel rays and their associated weights,
+        and the sensor's observables.
+
+    """
+    norm = lambda x: x / np.linalg.norm(x, axis=0)
+
+    #assert samples>=1, "Sample per pixel is an integer >= 1"
+    #assert int(samples) == samples, "Sample per pixel is an integer >= 1"
+
+    assert int(x_resolution) == x_resolution, "x_resolution is an integer >= 1"
+    assert int(y_resolution) == y_resolution, "y_resolution is an integer >= 1"
+
+    # The bounding_box is not nessesary in the prespactive projection, but we still may consider
+    # to use if we project the rays on the bounding_box when the differences in mu , phi angles are below certaine precision.
+    #     if(bounding_box is not None):
+
+    #         xmin, ymin, zmin = bounding_box.x.data.min(),bounding_box.y.data.min(),bounding_box.z.data.min()
+    #         xmax, ymax, zmax = bounding_box.x.data.max(),bounding_box.y.data.max(),bounding_box.z.data.max()
+
+    nx = x_resolution
+    ny = y_resolution
+    position = np.array(position_vector, dtype=np.float32)
+
+    M = max(nx, ny)
+    npix = nx*ny
+    R = np.array([nx, ny])/M # R will be used to scale the sensor meshgrid.
+    dy = 2*R[1]/ny # pixel length in y direction in the normalized image plane.
+    dx = 2*R[0]/nx # pixel length in x direction in the normalized image plane.
+    x_s, y_s, z_s = np.meshgrid(np.linspace(-R[0]+dx/2, R[0]-dx/2, nx),
+                                np.linspace(-R[1]+dy/2, R[1]-dy/2, ny), 1.0)
+
+    # Here x_c, y_c, z_c coordinates on the image plane before transformation to the requaired observation angle
+    focal = 1.0 / np.tan(np.deg2rad(fov) / 2.0) # focal (normalized) length when the sensor size is 2 e.g. r in [-1,1).
+    fov_x = np.rad2deg(2*np.arctan(R[0]/focal))
+    fov_y = np.rad2deg(2*np.arctan(R[1]/focal))
+
+    k = np.array([[focal, 0, 0],
+                  [0, focal, 0],
+                  [0, 0, 1]], dtype=np.float32)
+    inv_k = np.linalg.inv(k)
+
+    homogeneous_coordinates = np.stack([x_s.ravel(), y_s.ravel(), z_s.ravel()])
+
+    x_c, y_c, z_c = norm(np.matmul(
+        rotation_matrix, np.matmul(inv_k, homogeneous_coordinates)))
+    # Here x_c, y_c, z_c coordinates on the image plane after transformation to the requaired observation
+
+    # x,y,z mu, phi in the global coordinates:
+    mu = -z_c.astype(np.float64)
+    phi = (np.arctan2(y_c, x_c) + np.pi).astype(np.float64)
+    x = np.full(npix, position[0], dtype=np.float32)
+    y = np.full(npix, position[1], dtype=np.float32)
+    z = np.full(npix, position[2], dtype=np.float32)
+
+    image_shape = [nx,ny]
+    sensor = at3d.sensor.make_sensor_dataset(x.ravel(), y.ravel(), z.ravel(),
+                                 mu.ravel(), phi.ravel(), stokes, wavelength)
+    # compare to orthographic projection, prespective projection may not have bounding box.
+    #     if(bounding_box is not None):
+    #         sensor['bounding_box'] = xr.DataArray(np.array([xmin,ymin,zmin,xmax,ymax,zmax]),
+    #                                               coords={'bbox': ['xmin','ymin','zmin','xmax','ymax','zmax']},dims='bbox')
+
+    sensor['image_shape'] = xr.DataArray(image_shape,
+                                         coords={'image_dims': ['nx', 'ny']},
+                                         dims='image_dims')
+    sensor.attrs = {
+        'projection': 'Perspective',
+        'fov_deg': fov,
+        'fov_x_deg': fov_x,
+        'fov_y_deg': fov_y,
+        'x_resolution': x_resolution,
+        'y_resolution': y_resolution,
+        'position': position,
+        # 'lookat': lookat,
+        'rotation_matrix': rotation_matrix.ravel(),
+        'sensor_to_camera_transform_matrix':k.ravel()
+
+    }
+
+    sensor = at3d.sensor._add_null_subpixel_rays(sensor)
+    return sensor
 
 class LossAT3D(torch.autograd.Function):
     @staticmethod
@@ -34,7 +162,7 @@ class LossAT3D(torch.autograd.Function):
         return gradient * grad_output.clone(), None
 
 
-class DiffRendererSHDOM(object):
+class DiffRendererAT3D(object):
     """
     Optimize: Extinction
     --------------------
@@ -57,80 +185,66 @@ class DiffRendererSHDOM(object):
     def __init__(self, cfg):
         self.scatterer_name = 'cloud'
         self._init_solution = False
-        self.projections = self.get_projections(cfg)
-        self.cameras = at3d.sensor.perspective_projection(0.86, 5.0, 100, 100,
-                           [0,0,1], [0,0,0], [0,1,0],
-                           stokes=['I'], sub_pixel_ray_args={'method':None})
-        self.rte_solver = self.get_rte_solver(cfg)
+        self.load_solver(cfg)
+
+
+        self.state_gen = None
+
         self.n_jobs = cfg.shdom.n_jobs
         self.min_bound = cfg.cross_entropy.min
         self.max_bound = cfg.cross_entropy.max
         self.use_forward_grid = cfg.shdom.use_forward_grid
-        self.mie_base_path = '../../../pyshdom/mie_tables/polydisperse/Water_<wavelength>nm.scat'
-        self.add_rayleigh = cfg.shdom.add_rayleigh
-
-        parser = argparse.ArgumentParser()
-        # CloudGenerator = getattr(shdom.generate, 'Homogenous')
-        CloudGenerator = Monotonous
-        parser = CloudGenerator.update_parser(parser)
-
-        AirGenerator = None
-        if self.add_rayleigh:
-            AirGenerator = shdom.generate.AFGLSummerMidLatAir
-            parser = AirGenerator.update_parser(parser)
-        self.args = parser.parse_args()
-        self.args.air_path = '../../../pyshdom/ancillary_data/AFGL_summer_mid_lat.txt'
-        self.args.air_max_alt = 5
-        self.args.extinction = 0
-        self.cloud_generator = CloudGenerator(self.args)
-        self.table_path = self.mie_base_path.replace('<wavelength>', '{}'.format(shdom.int_round(self.wavelength)))
-        self.cloud_generator.add_mie(self.table_path)
-        self.air_generator = AirGenerator(self.args) if AirGenerator is not None else None
-
 
 
         # L2 Loss
         self.image_mean = cfg.data.mean
         self.image_std = cfg.data.std
-        self.loss_shdom = LossSHDOM().apply
+        self.loss_at3d = LossAT3D().apply
         self.loss_operator = torch.nn.Identity()
+
 
     def get_grid(self, grid):
         grid = shdom.Grid(x=grid[0],y=grid[1],z=grid[2])
         return grid
 
-    def get_rte_solver(self,cfg):
-        if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
-            path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/solver2.pkl'
-        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or 'BOMEX_50CCN_aux_10cameras_20m':
-            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/solver.pkl'
-        else:
-            NotImplementedError()
-        solver = shdom.RteSolver()
-        solver.load_params(path)
-        # params = solver._numerical_parameters
-        # params.num_mu_bins = 2
-        # params.num_phi_bins = 4
-        # solver.set_numerics(params)
-        self.wavelength = solver.wavelength
-        return shdom.RteSolverArray([solver])
+    def load_solver(self,cfg):
+        # if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
+        #     path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/solver2.pkl'
+        # elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
+        #     path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/at3d.nc'
+        # else:
+        #     NotImplementedError()
+        path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/at3d.nc'
+        self.sensors, self.solvers, self.rte_grid = at3d.util.load_forward_model(path)
+        self.wavelength = self.sensors.get_unique_solvers()[0]
 
-    def get_projections(self,cfg):
-        if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
-            path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/shdom_projections2.pkl'
-        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or cfg.data.dataset_name == 'BOMEX_50CCN_aux_10cameras_20m' or cfg.data.dataset_name == 'BOMEX_10cameras_20m':
-            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/shdom_projections.pkl'
-        elif cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
-            path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
-        else:
-            NotImplementedError()
-        with open(path, 'rb') as pickle_file:
-            projection_list = pickle.load(pickle_file)['projections']
-        return shdom.MultiViewProjection(projection_list)
+        return
+
+    # def get_projections(self,cfg):
+    #     if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
+    #         path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/shdom_projections2.pkl'
+    #     elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m' or cfg.data.dataset_name == 'BOMEX_50CCN_aux_10cameras_20m' or cfg.data.dataset_name == 'BOMEX_10cameras_20m':
+    #         path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/shdom_projections.pkl'
+    #     elif cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
+    #         path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
+    #     else:
+    #         NotImplementedError()
+    #     with open(path, 'rb') as pickle_file:
+    #         projection_list = pickle.load(pickle_file)['projections']
+    #     sensor_dict = at3d.containers.SensorsDict()
+    #
+    #     for projection in projection_list:
+    #         sensor_dict.add_sensor('SideViewCamera',
+    #                                perspective_projection(self.wavelength, projection._fov, projection.resolution[0], projection.resolution[1], projection.position,
+    #                                                                   projection._rotation_matrix,
+    #                                                                   stokes='I')
+    #                                )
+    #
+    #     return sensor_dict
 
 
 
-    def get_medium_estimator(self, cloud_extinction, mask, volume):
+    def get_medium_estimator(self, mask):
         """
         Generate the medium estimator for optimization.
 
@@ -149,123 +263,27 @@ class DiffRendererSHDOM(object):
         """
 
         # Define the grid for reconstruction
-        if self.use_forward_grid:
-            extinction_grid = albedo_grid = phase_grid = self.get_grid(volume._grid[0])
-        else:
-            NotImplementedError()
-            # extinction_grid = albedo_grid = phase_grid = self.get_grid()
-        grid = extinction_grid + albedo_grid + phase_grid
+        optical_properties = self.solvers[self.wavelength].medium['cloud'].copy(deep=True)
+        optical_properties = optical_properties.drop_vars('extinction')
+
+        # We are using the ground_truth rte_grid.
+        grid_to_optical_properties = at3d.medium.GridToOpticalProperties(
+            self.rte_grid, 'cloud', self.wavelength, optical_properties
+        )
+
+        # UnknownScatterers is a container for all of the unknown variables.
+        # Each unknown_scatterer also records the transforms from the abstract state vector
+        # to the gridded data in physical coordinates.
+        unknown_scatterers = at3d.containers.UnknownScatterers(
+            at3d.medium.UnknownScatterer(grid_to_optical_properties,
+                                         extinction=(
+                                             None, at3d.transforms.StateToGridMask(mask=mask)))
+        )
 
 
-        # Define the known albedo and phase: either ground-truth or specified, but it is not optimized.
 
+        return unknown_scatterers
 
-        albedo = self.cloud_generator.get_albedo(self.wavelength, albedo_grid)
-
-        path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/medium_3827.pkl'
-        medium = shdom.Medium()
-        medium.load(path)
-
-
-        cloud = medium.get_scatterer('cloud')
-        cloud.resample(grid)
-        cloud._reff = self.cloud_generator.get_reff(grid)
-        # medium.scatterers['cloud']._veff._data[:,:,:] = 0.01
-        cloud._veff._data[cloud_extinction>0] = self.cloud_generator.get_veff(grid)._data[cloud_extinction>0]
-        phase = cloud.get_phase(self.wavelength)
-
-        # phase = self.cloud_generator.get_phase(self.wavelength, mask=cloud_extinction>1.0, grid = phase_grid)
-
-        ext = self.cloud_generator.get_extinction(grid=grid)
-        ext._data[mask] = cloud_extinction[mask]
-        ext._data[np.bitwise_not(mask)] = 0
-        extinction = shdom.GridDataEstimator(ext,
-                                             min_bound=self.min_bound + 1e-3,
-                                             max_bound=self.max_bound)
-        cloud_estimator = shdom.OpticalScattererEstimator(self.wavelength, extinction, albedo, phase)
-        cloud_mask = shdom.GridData(cloud_estimator.grid, mask)
-        cloud_estimator.set_mask(cloud_mask)
-
-        # Create a medium estimator object (optional Rayleigh scattering)
-        medium_estimator = shdom.MediumEstimator()
-        medium_estimator.add_scatterer(cloud_estimator, self.scatterer_name) #MUST BE FIRST!!!
-
-        if self.add_rayleigh:
-            air = self.air_generator.get_scatterer(self.wavelength)
-            medium_estimator.set_grid(cloud_estimator.grid + air.grid)
-            medium_estimator.add_scatterer(air, 'air')
-        else:
-            medium_estimator.set_grid(cloud_estimator.grid)
-
-
-        # ext_fixed = self.cloud_generator.get_extinction(grid=grid)
-        # ext_fixed._data[np.bitwise_not(mask)] = cloud_extinction[np.bitwise_not(mask)]
-        # ext_fixed._data[mask] = 0
-        # cloud_fixed = shdom.OpticalScatterer(self.wavelength, ext_fixed, albedo, phase)
-        # medium_estimator.add_scatterer(cloud_fixed, 'cloud_fixed')
-
-
-        return medium_estimator
-
-    def get_bounds(self):
-        """
-        Retrieve the bounds for every parameter from the MediumEstimator (used by scipy.minimize)
-
-        Returns
-        -------
-        bounds: list of tuples
-            The lower and upper bound of each parameter
-        """
-        return self.medium.get_bounds()
-
-    def get_state(self):
-        """
-        Retrieve MediumEstimator state
-
-        Returns
-        -------
-        state: np.array(dtype=np.float64)
-            The state of the medium estimator
-        """
-        return self.medium.get_state()
-
-    def set_state(self, state):
-        """
-        Set the state of the optimization. This means:
-          1. Setting the MediumEstimator state
-          2. Updating the RteSolver medium
-          3. Computing the direct solar flux
-          4. Computing the current RTE solution with the previous solution as an initialization
-
-        Returns
-        -------
-        state: np.array(dtype=np.float64)
-            The state of the medium estimator
-        """
-        self.medium.set_state(state)
-        self.rte_solver.set_medium(self.medium)
-        if self._init_solution is False:
-            self.rte_solver.make_direct()
-        self.rte_solver.solve(maxiter=100, init_solution=self._init_solution, verbose=False)
-
-    def init_optimizer(self):
-        """
-        Initialize the optimizer.
-        This means:
-          1. Setting the RteSolver medium
-          2. Initializing a solution
-          3. Computing the direct solar flux derivatives
-          4. Counting the number of unknown parameters
-        """
-
-        assert self.measurements.num_channels == self.medium.num_wavelengths, \
-            'Measurements have {} channels and Medium has {} wavelengths'.format(
-                self.measurements.num_channels, self.medium.num_wavelengths)
-
-        self.rte_solver.set_medium(self.medium)
-        self.rte_solver.init_solution()
-        self.medium.compute_direct_derivative(self.rte_solver)
-        self._num_parameters = self.medium.num_parameters
 
     def render(self, cloud, mask, volume, gt_images):
         """
@@ -298,32 +316,56 @@ class DiffRendererSHDOM(object):
         gt_images *= self.image_std
         gt_images += self.image_mean
         gt_images = list(gt_images)
-        # gt_images = gt_images.cpu().numpy()
-        # mask_images = gt_images>0.02
-        # masked_proj_list =[]
-        # for proj, mask_image in zip(self.cameras.projection.projection_list, mask_images[0]):
-        #     masked_proj_list.append(proj[mask_image.ravel('F')])
-        #
-        # masked_camera = shdom.Camera(self.cameras.sensor, shdom.MultiViewProjection(masked_proj_list))
-        self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
+
+        unknown_scatterers = self.get_medium_estimator(mask.cpu().numpy())
+
+        # now we form state_gen which updates the solvers with an input_state.
+        solvers_reconstruct = at3d.containers.SolversDict()
         cloud_state = cloud[mask]
+        if self.state_gen is None:
+            # prepare all of the static inputs to the solver just copy pasted from forward model
+            surfaces = OrderedDict()
+            numerical_parameters = OrderedDict()
+            sources = OrderedDict()
+            num_stokes = OrderedDict()
+            background_optical_scatterers = OrderedDict()
+            for key in self.sensors.get_unique_solvers():
+                surfaces[key] = self.solvers[key].surface
+                numerical_params = self.solvers[key].numerical_params
+                # numerical_params['num_mu_bins'] = 2
+                # numerical_params['num_phi_bins'] = 4
+                numerical_parameters[key] = numerical_params
+                sources[key] = self.solvers[key].source
+                num_stokes[key] = self.solvers[key]._nstokes
+                background_optical_scatterers[key] = {'rayleigh': self.solvers[key].medium['rayleigh']}
+            # now we form state_gen which updates the solvers with an input_state.
+            self.state_gen = at3d.medium.StateGenerator(solvers_reconstruct,
+                                                        unknown_scatterers, surfaces,
+                                                        numerical_parameters, sources,
+                                                        background_optical_scatterers,
+                                                        num_stokes)
 
-        self.medium = self.get_medium_estimator(cloud.detach().cpu().numpy(),mask.cpu().numpy(), volume)
-        # cloud_estimator = self.medium.scatterers['cloud']
-        # cloud_mask = shdom.GridData(cloud_estimator.grid, (mask.cpu().numpy()))
-        # cloud_estimator.set_mask(cloud_mask)
-        self.init_optimizer()
+        else:
+            self.state_gen = at3d.medium.StateGenerator(solvers_reconstruct,
+                                               unknown_scatterers, self.state_gen._surfaces,
+                                               self.state_gen._numerical_parameters, self.state_gen._sources,
+                                                    self.state_gen._background_optical_scatterers, self.state_gen._num_stokes)
 
-        self.set_state(cloud_state.detach().cpu().numpy())
+        self.state_gen(cloud_state.detach().cpu().numpy())
+        objective_function = at3d.optimize.ObjectiveFunction.LevisApproxUncorrelatedL2(
+    self.sensors, solvers_reconstruct, self.sensors, unknown_scatterers, self.state_gen,
+            self.state_gen.project_gradient_to_state,
+    parallel_solve_kwargs={'n_jobs': self.n_jobs, 'verbose': False},
+  gradient_kwargs={'cost_function': 'L2', 'exact_single_scatter':True},
+  uncertainty_kwargs={'add_noise': False},
+  min_bounds=self.min_bound, max_bounds=self.max_bound)
 
-        # self._iteration += 1
-        gradient, loss, pixels = self.medium.compute_gradient(
-            rte_solvers=self.rte_solver,
-            measurements=self.measurements,
-            n_jobs=self.n_jobs
-        )
+        optimizer = at3d.optimize.Optimizer(objective_function)
+        loss, gradient = optimizer.objective(cloud_state.detach().cpu().numpy())
+
         gt_images = np.array(gt_images)
-        images = np.array(pixels)
+        images = self.sensors.get_images('SideViewCamera')
+        images = [image.I.data for image in images]
         # images = []
         # for im, im_gt,masked_im in zip(pixels,gt_images[0],mask_images[0]):
         #     masked_image = np.zeros(im_gt.size)
@@ -337,33 +379,31 @@ class DiffRendererSHDOM(object):
         # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
         # plt.show()
 
-        # plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
-        # plt.axis('square')
-        # plt.show()
-        # f, axarr = plt.subplots(3, len(images))
-        # for ax, image,gt in zip(axarr.T, images,gt_images):
-        #     ax[0].imshow(image)
-        #     ax[1].imshow(gt)
-        #     ax[2].imshow(np.abs(gt-image))
-        #     # ax.invert_xaxis()
-        #     # ax.invert_yaxis()
-        #     ax[0].axis('off')
-        #     ax[1].axis('off')
-        #     ax[2].axis('off')
-        # plt.title(f'loss={loss}')
-        # plt.tight_layout()
-        # plt.show()
+        plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
+        plt.axis('square')
+        plt.show()
+        f, axarr = plt.subplots(3, len(images))
+        for ax, image,gt in zip(axarr.T, images,gt_images):
+            ax[0].imshow(image)
+            ax[1].imshow(gt)
+            ax[2].imshow(np.abs(gt-image))
+            # ax.invert_xaxis()
+            # ax.invert_yaxis()
+            ax[0].axis('off')
+            ax[1].axis('off')
+            ax[2].axis('off')
+        plt.title(f'loss={loss}')
+        plt.tight_layout()
+        plt.show()
 
         # print(np.sum(np.array(gt_images)-images)**2)
         self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
         self.images = images
         self.gt_images = gt_images
         self.gradient = gradient
-        l2_loss = self.loss_shdom(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
+        l2_loss = self.loss_at3d(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
         return self.loss_operator(l2_loss)
 
 
 
 
-if __name__ == "__main__":
-    DiffRendererSHDOM({'a':None})

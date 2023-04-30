@@ -1,7 +1,7 @@
 hydra:
   run:
-#    dir: ../outputs/${now:%Y-%m-%d}_FT_HAWAII_2000CCN_Train=bomex500_v2_mode_train_lr5.0e-05_monoton_phase/${now:%H-%M-%S}
-    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_FT_HAWAII_2000CCN_Train=HAWAII_2000_v2_mode_train_lr5.0e-06_AT3D/${now:%H-%M-%S}
+#    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 seed: 0
 debug: False
 resume: True
@@ -13,11 +13,11 @@ checkpoint_iteration_interval: 5
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_V1_noise/14-16-49/checkpoints/cp_230000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_50CCN_10cameras_20m_V1_noise/14-15-58/checkpoints/cp_225000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
-#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-23_Train_Hawaii2000_10cameras_20m_V1_noise/15-02-48/checkpoints/cp_145000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_CE_noise/14-14-03/checkpoints/cp_230000.pth'
-gpu: 2
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-23_Train_Hawaii2000_10cameras_20m_V2_noise/15-01-46/checkpoints/cp_160000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_CE_noise/14-14-03/checkpoints/cp_230000.pth'
+gpu: 0
 data:
-  dataset_name: 'BOMEX_50CCN_10cameras_20m' #'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
+  dataset_name: 'HAWAII_2000CCN_10cameras_20m'#'HAWAII_2000CCN_10cameras_20m' BOMEX_10cameras_20m#'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
   n_training: -1
   n_val: 30
   n_cam: 10
@@ -28,7 +28,7 @@ data:
 
 optimizer:
   max_epochs: 100000
-  lr: 5.0e-05
+  lr: 5.0e-06
   wd: 1.0e-05
   batch_size: 1
   iter_steps: [1000000000]
@@ -92,6 +92,7 @@ decoder:
 
 shdom:
   n_jobs: 35
+  n_clouds: 5
   use_forward_grid: True
   add_rayleigh: True
 

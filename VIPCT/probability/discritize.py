@@ -82,6 +82,8 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             # prob[:,0] /= 100
             weights = prob**prob_gain
             weights /= weights.sum(-1)[...,None]
+            if torch.isnan(weights.max()):
+                print('weight nan')
             weighted_bins = weights * bin_values
             pred = weighted_bins.sum(-1)  # discrete_pred.sum(-1) should be 1
             pred[torch.isnan(pred)] = 0

@@ -6,16 +6,49 @@ import pylab as py
 import pickle
 import pandas as pd
 import matplotlib.pyplot as plt
+
+def load_from_csv_shdom(path, density=None, origin=(0.0,0.0)):
+
+    df = pd.read_csv(path, comment='#', skiprows=3, delimiter=' ')
+    nx, ny, nz = np.genfromtxt(path, skip_header=1, max_rows=1, dtype=int, delimiter=' ')
+    dx, dy = np.genfromtxt(path, max_rows=1, usecols=(0, 1), dtype=float, skip_header=2)
+    z_grid = np.genfromtxt(path, max_rows=1, usecols=range(2, 2 + nz), dtype=float, skip_header=2)
+    z = xr.DataArray(z_grid, coords=[range(nz)], dims=['z'])
+
+    dset = at3d.grid.make_grid(dx, nx, dy, ny, z)
+
+    for index,name in zip([3,4,5],['lwc','reff','veff']):
+        #initialize with np.nans so that empty data is np.nan
+        variable_data = np.zeros((dset.sizes['x'], dset.sizes['y'], dset.sizes['z']))
+        i=df.values[:,0].astype(int)
+        j=df.values[:,1].astype(int)
+        k=df.values[:,2].astype(int)
+
+        variable_data[i, j, k] = df.values[:,index]
+        dset[name] = (['x', 'y', 'z'], variable_data)
+
+    if density is not None:
+        assert density in dset.data_vars, \
+        "density variable: '{}' must be in the file".format(density)
+
+        dset = dset.rename_vars({density: 'density'})
+        dset.attrs['density_name'] = density
+
+    dset.attrs['file_name'] = path
+
+    return dset
+
 def load_from_csv(path, density=None, origin=(0.0,0.0)):
 
     df = pd.read_csv(path, comment='#', skiprows=4, index_col=['x', 'y', 'z'])
     nx, ny, nz = np.genfromtxt(path, skip_header=1, max_rows=1, dtype=int, delimiter=',')
     dx, dy = np.genfromtxt(path, max_rows=1, dtype=float, skip_header=2, delimiter=',')
+    # zz= np.array([0.000,0.040,0.080,0.120,0.160,0.200,0.240,0.280,0.320,0.360,0.400,0.440,0.480,0.520,0.560,0.600,0.640,0.680,0.720,0.760,0.800,0.840,0.880,0.920,0.960,1.000,1.040,1.080,1.120,1.160,1.200,1.240])
     z = xr.DataArray(np.genfromtxt(path, max_rows=1, dtype=float, skip_header=3, delimiter=','), coords=[range(nz)], dims=['z'])
+    # z = xr.DataArray(zz, coords=[range(nz)], dims=['z'])
 
     dset = at3d.grid.make_grid(dx, nx, dy, ny, z)
     i, j, k = zip(*df.index)
-
     for name in df.columns:
         #initialize with np.nans so that empty data is np.nan
         variable_data = np.zeros((dset.sizes['x'], dset.sizes['y'], dset.sizes['z']))*np.nan
@@ -41,15 +74,15 @@ def get_projections(cfg=None):
     #     path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/shdom_projections.pkl'
     # elif cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
     #     path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
+
     path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/shdom_projections.pkl'
+    path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
 
     with open(path, 'rb') as pickle_file:
         projection_list = pickle.load(pickle_file)['projections']
     sensor_dict = at3d.containers.SensorsDict()
 
-    def perspective_projection(wavelength, fov, x_resolution, y_resolution,
-                               position_vector, rotation_matrix,
-                               stokes='I'):
+    def perspective_projection(wavelength, projection, stokes='I'):
         """
         Generates a sensor dataset that observes a target location with
         a perspective (pinhole camera) projection.
@@ -99,9 +132,10 @@ def get_projections(cfg=None):
 
         # assert samples>=1, "Sample per pixel is an integer >= 1"
         # assert int(samples) == samples, "Sample per pixel is an integer >= 1"
-
-        assert int(x_resolution) == x_resolution, "x_resolution is an integer >= 1"
-        assert int(y_resolution) == y_resolution, "y_resolution is an integer >= 1"
+        nx = projection.resolution[0]
+        ny = projection.resolution[1]
+        assert int(nx) == nx, "x_resolution is an integer >= 1"
+        assert int(ny) == ny, "y_resolution is an integer >= 1"
 
         # The bounding_box is not nessesary in the prespactive projection, but we still may consider
         # to use if we project the rays on the bounding_box when the differences in mu , phi angles are below certaine precision.
@@ -110,19 +144,20 @@ def get_projections(cfg=None):
         #         xmin, ymin, zmin = bounding_box.x.data.min(),bounding_box.y.data.min(),bounding_box.z.data.min()
         #         xmax, ymax, zmax = bounding_box.x.data.max(),bounding_box.y.data.max(),bounding_box.z.data.max()
 
-        nx = x_resolution
-        ny = y_resolution
-        position = np.array(position_vector, dtype=np.float32)
+
+        position = np.array(projection.position, dtype=np.float32)
 
         M = max(nx, ny)
         npix = nx * ny
         R = np.array([nx, ny]) / M  # R will be used to scale the sensor meshgrid.
         dy = 2 * R[1] / ny  # pixel length in y direction in the normalized image plane.
         dx = 2 * R[0] / nx  # pixel length in x direction in the normalized image plane.
-        x_s, y_s, z_s = np.meshgrid(np.linspace(-R[0] + dx / 2, R[0] - dx / 2, nx),
-                                    np.linspace(-R[1] + dy / 2, R[1] - dy / 2, ny), 1.0)
-
+        # x_s, y_s, z_s = np.meshgrid(np.linspace(-R[0] + dx / 2, R[0] - dx / 2, nx),
+        #                             np.linspace(-R[1] + dy / 2, R[1] - dy / 2, ny), 1.0)
+        x_s, y_s, z_s = np.meshgrid(np.linspace(-R[0], R[0] - dx, nx), np.linspace(-R[1], R[1] - dy, ny),
+                                    1.0)
         # Here x_c, y_c, z_c coordinates on the image plane before transformation to the requaired observation angle
+        fov = projection._fov
         focal = 1.0 / np.tan(
             np.deg2rad(fov) / 2.0)  # focal (normalized) length when the sensor size is 2 e.g. r in [-1,1).
         fov_x = np.rad2deg(2 * np.arctan(R[0] / focal))
@@ -136,7 +171,7 @@ def get_projections(cfg=None):
         homogeneous_coordinates = np.stack([x_s.ravel(), y_s.ravel(), z_s.ravel()])
 
         x_c, y_c, z_c = norm(np.matmul(
-            rotation_matrix, np.matmul(inv_k, homogeneous_coordinates)))
+            projection._rotation_matrix, np.matmul(inv_k, homogeneous_coordinates)))
         # Here x_c, y_c, z_c coordinates on the image plane after transformation to the requaired observation
 
         # x,y,z mu, phi in the global coordinates:
@@ -162,11 +197,11 @@ def get_projections(cfg=None):
             'fov_deg': fov,
             'fov_x_deg': fov_x,
             'fov_y_deg': fov_y,
-            'x_resolution': x_resolution,
-            'y_resolution': y_resolution,
+            'x_resolution': nx,
+            'y_resolution': ny,
             'position': position,
             # 'lookat': lookat,
-            'rotation_matrix': rotation_matrix.ravel(),
+            'rotation_matrix': projection._rotation_matrix.ravel(),
             'sensor_to_camera_transform_matrix': k.ravel()
 
         }
@@ -176,16 +211,13 @@ def get_projections(cfg=None):
 
     for projection in projection_list:
         sensor_dict.add_sensor('SideViewCamera',
-                               perspective_projection(0.672, projection._fov, projection.resolution[0],
-                                                      projection.resolution[1], projection.position,
-                                                      projection._rotation_matrix,
-                                                      stokes='I')
+                               perspective_projection(0.672, projection, stokes='I')
                                )
 
     return sensor_dict
 
 ### Make the RTE grid and medium microphysics.
-cloud_scatterer = load_from_csv('/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/cloud0.txt',
+cloud_scatterer = load_from_csv('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/cloud64785.txt',
                                            density='lwc',origin=(0.0,0.0))
 
 #load atmosphere
@@ -213,6 +245,8 @@ size_distribution_function = at3d.size_distribution.gamma
 
 #%% md
 cloud_scatterer_on_rte_grid['veff'].values[cloud_scatterer_on_rte_grid['veff'].values >0.4] = 0.4
+# cloud_scatterer_on_rte_grid['veff'].values[np.bitwise_and(cloud_scatterer_on_rte_grid['veff'].values < 0.1 , cloud_scatterer_on_rte_grid['veff'].values >0)] = 0.1
+cloud_scatterer_on_rte_grid['reff'].values[cloud_scatterer_on_rte_grid['reff'].values <1] = 1
 ### Define Sensors
 sensor_dict = get_projections()
 wavelengths = sensor_dict.get_unique_solvers()
@@ -232,7 +266,7 @@ for wavelength in wavelengths:
         verbose=True
     )
 
-#%%
+
 
 optical_property_generator = at3d.medium.OpticalPropertyGenerator(
     'cloud',
@@ -243,10 +277,10 @@ optical_property_generator = at3d.medium.OpticalPropertyGenerator(
 )
 optical_properties = optical_property_generator(cloud_scatterer_on_rte_grid)
 
-#%%
+
 
 # one function to generate rayleigh scattering.
-rayleigh_scattering = at3d.rayleigh.to_grid(wavelengths,atmosphere,rte_grid)
+rayleigh_scattering = at3d.rayleigh.to_grid(wavelengths,reduced_atmosphere,rte_grid)
 
 
 
@@ -262,7 +296,7 @@ solvers_dict = at3d.containers.SolversDict()
 # just as we have got solver dependent optical properties.
 solar_azimuth= 45  # azimuth: 0 is beam going in positive X direction (North), 90 is positive Y (East).
 sun_zenith= 150  # zenith: Solar beam zenith angle in range (90,180]
-solarmu =  np.cos(np.deg2rad(sun_zenith))
+solarmu = np.cos(np.deg2rad(sun_zenith))
 for wavelength in sensor_dict.get_unique_solvers():
     medium = {
         'cloud': optical_properties[wavelength],
@@ -280,7 +314,6 @@ for wavelength in sensor_dict.get_unique_solvers():
         )
    )
 
-#%%
 
 sensor_dict.get_measurements(solvers_dict, n_jobs=1, verbose=True)
 
@@ -295,7 +328,7 @@ sensor_dict.get_measurements(solvers_dict, n_jobs=1, verbose=True)
 # line of apparent radiance.
 
 
-with open('/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/train/cloud_results_0.pkl', 'rb') as f:
+with open('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/train/cloud_results_64785.pkl', 'rb') as f:
     pyshdom_images = pickle.load(f)['images']
 
 for instrument in sensor_dict:
@@ -315,4 +348,4 @@ for instrument in sensor_dict:
 # as they are large.
 # See solver.save_solution / solver.load_solution() for how to save & load those RTE solutions.
 # Those functions are not yet integrated into util.save_forward_model / util.load_forward_model.
-at3d.util.save_forward_model('/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/at3d.nc', sensor_dict, solvers_dict)
+at3d.util.save_forward_model('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/at3d.nc', sensor_dict, solvers_dict)

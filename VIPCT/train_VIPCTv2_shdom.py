@@ -189,6 +189,10 @@ def main(cfg: DictConfig):
 
     if writer:
         val_scatter_ind = np.random.permutation(len(val_dataloader))[:5]
+    est_vols = []
+    volumes = []
+    mask_list = []
+    images_list = []
     for epoch in range(start_epoch, cfg.optimizer.max_epochs):
         for i, batch in enumerate(train_dataloader):
             # lr_scheduler(None)
@@ -279,6 +283,7 @@ def main(cfg: DictConfig):
                 print("Images are too inconsistent, skip gradient update for stability")
                 continue
             loss.backward()
+
             skip=False
             for param in model.decoder.parameters():
                 if param.requires_grad and not torch.all(torch.isfinite(param.grad)):

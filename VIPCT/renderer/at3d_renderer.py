@@ -214,9 +214,13 @@ class DiffRendererAT3D(object):
         #     path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/at3d.nc'
         # else:
         #     NotImplementedError()
-        path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/at3d.nc'
+        if cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m':
+            path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/at3d.nc'
+        elif cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
+            path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/at3d.nc'
         self.sensors, self.solvers, self.rte_grid = at3d.util.load_forward_model(path)
         self.wavelength = self.sensors.get_unique_solvers()[0]
+
 
         return
 
@@ -244,7 +248,7 @@ class DiffRendererAT3D(object):
 
 
 
-    def get_medium_estimator(self, mask):
+    def get_medium_estimator(self, mask,volume):
         """
         Generate the medium estimator for optimization.
 
@@ -266,7 +270,7 @@ class DiffRendererAT3D(object):
         optical_properties = self.solvers[self.wavelength].medium['cloud'].copy(deep=True)
         optical_properties = optical_properties.drop_vars('extinction')
 
-        # We are using the ground_truth rte_grid.
+
         grid_to_optical_properties = at3d.medium.GridToOpticalProperties(
             self.rte_grid, 'cloud', self.wavelength, optical_properties
         )
@@ -317,7 +321,7 @@ class DiffRendererAT3D(object):
         gt_images += self.image_mean
         gt_images = list(gt_images)
 
-        unknown_scatterers = self.get_medium_estimator(mask.cpu().numpy())
+        unknown_scatterers = self.get_medium_estimator(mask.cpu().numpy(),volume)
 
         # now we form state_gen which updates the solvers with an input_state.
         solvers_reconstruct = at3d.containers.SolversDict()
@@ -332,8 +336,8 @@ class DiffRendererAT3D(object):
             for key in self.sensors.get_unique_solvers():
                 surfaces[key] = self.solvers[key].surface
                 numerical_params = self.solvers[key].numerical_params
-                # numerical_params['num_mu_bins'] = 2
-                # numerical_params['num_phi_bins'] = 4
+                numerical_params['num_mu_bins'] = 2
+                numerical_params['num_phi_bins'] = 4
                 numerical_parameters[key] = numerical_params
                 sources[key] = self.solvers[key].source
                 num_stokes[key] = self.solvers[key]._nstokes
@@ -355,8 +359,8 @@ class DiffRendererAT3D(object):
         objective_function = at3d.optimize.ObjectiveFunction.LevisApproxUncorrelatedL2(
     self.sensors, solvers_reconstruct, self.sensors, unknown_scatterers, self.state_gen,
             self.state_gen.project_gradient_to_state,
-    parallel_solve_kwargs={'n_jobs': self.n_jobs, 'verbose': False},
-  gradient_kwargs={'cost_function': 'L2', 'exact_single_scatter':True},
+    parallel_solve_kwargs={'n_jobs': self.n_jobs, 'verbose': True},
+  gradient_kwargs={'cost_function': 'L2', 'exact_single_scatter':False},
   uncertainty_kwargs={'add_noise': False},
   min_bounds=self.min_bound, max_bounds=self.max_bound)
 

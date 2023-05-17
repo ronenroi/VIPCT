@@ -18,14 +18,14 @@ import warnings
 import hydra
 import numpy as np
 from VIPCT.dataloader.airmspi_dataset import get_real_world_airmspi_datasets, trivial_collate
-from VIPCT.CTnet import *
+from VIPCT.VIPCT.CTnet import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
 from  VIPCT.scene.cameras import AirMSPICameras
 from VIPCT.scene.volumes import Volumes
 import scipy.io as sio
 
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../configs")
 
 @hydra.main(config_path=CONFIG_DIR, config_name="vip-ct_test_airmspi")
 def main(cfg: DictConfig):

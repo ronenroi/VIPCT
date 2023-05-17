@@ -422,8 +422,6 @@ def main(cfg: DictConfig):
                 print(f"Storing checkpoint {curr_checkpoint_path}.")
                 data_to_store = {
                     "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "stats": pickle.dumps(stats),
                 }
                 torch.save(data_to_store, curr_checkpoint_path)
 

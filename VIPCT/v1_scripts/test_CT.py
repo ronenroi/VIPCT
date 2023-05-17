@@ -20,7 +20,7 @@ import warnings
 import hydra
 import numpy as np
 import torch
-from dataloader.dataset import get_cloud_datasets, trivial_collate
+from VIPCT.dataloader.dataset import get_cloud_datasets, trivial_collate
 from VIPCT.VIPCT.CTnet import *
 from omegaconf import OmegaConf
 from omegaconf import DictConfig
@@ -35,7 +35,7 @@ relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) 
 L2_error = lambda ext_est, ext_gt, eps=1e-6 : torch.sum((ext_est.view(-1) - ext_gt.view(-1))**2) / (torch.sum((ext_gt.view(-1))**2) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../configs")
 
 @hydra.main(config_path=CONFIG_DIR, config_name="vip-ct_test")
 def main(cfg: DictConfig):

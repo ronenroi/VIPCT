@@ -224,14 +224,14 @@ def main(cfg: DictConfig):
                 xv, yv, zv = np.meshgrid(np.linspace(0, gt_vol.shape[0],
                                                      gt_vol.shape[0]),np.linspace(0, gt_vol.shape[1], gt_vol.shape[1]),
                                          np.linspace(0, gt_vol.shape[2], gt_vol.shape[2]))
-                plt.scatter(gt_vol[est_vols>1].ravel().cpu(), est_vols[est_vols>1].ravel().cpu(),c=conf_vol[est_vols>1].ravel().cpu())
+                plt.scatter(gt_vol[est_vols>1].ravel().cpu(), est_vols[est_vols>1].ravel().cpu(),c=torch.log(conf_vol[est_vols>1].ravel().cpu()))
                 plt.colorbar()
                 plt.plot([0,gt_vol[est_vols>1].ravel().cpu().max()],[0,gt_vol[est_vols>1].ravel().cpu().max()],'r')
                 plt.xlabel('gt')
                 plt.ylabel('est')
                 plt.axis('square')
                 plt.show()
-                plt.scatter(torch.abs(gt_vol[est_vols>1].ravel().cpu() - est_vols[est_vols>1].ravel().cpu()), conf_vol[est_vols>1].ravel().cpu())
+                plt.scatter(torch.abs(gt_vol[est_vols>1].ravel().cpu() - est_vols[est_vols>1].ravel().cpu()), torch.log(conf_vol[est_vols>1].ravel().cpu()))
                 plt.xlabel('|gt-est|')
                 plt.ylabel('confidence')
                 plt.show()
@@ -263,7 +263,7 @@ def main(cfg: DictConfig):
                     est_vol_out = est_vols[cloud_out==1]
                     conf_vol_out = conf_vol[cloud_out==1]
 
-                    sio.savemat('mask_toy_cloud2.mat',{'cloud_in':cloud_in,'cloud_mid':cloud_mid,'cloud_out':cloud_out})
+                    # sio.savemat('mask_toy_cloud2.mat',{'cloud_in':cloud_in,'cloud_mid':cloud_mid,'cloud_out':cloud_out})
 
             if cfg.save_results:
                 val_image *= cfg.data.std

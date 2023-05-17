@@ -22,6 +22,8 @@ import warnings
 # sys.path.insert(0, '/home/roironen/pyshdom-NN/projects')
 import hydra
 import numpy as np
+import torch
+
 from dataloader.dataset import get_cloud_datasets, trivial_collate
 from dataloader.airmspi_dataset import get_airmspi_datasets
 
@@ -106,10 +108,10 @@ def main(cfg: DictConfig):
         print(f"Resuming from checkpoint {checkpoint_resume_path}.")
         loaded_data = torch.load(checkpoint_resume_path, map_location=device)
         model.load_state_dict(loaded_data["model"])
-        stats = pickle.loads(loaded_data["stats"])
-        print(f"   => resuming from epoch {stats.epoch}.")
-        optimizer_state_dict = loaded_data["optimizer"]
-        start_epoch = stats.epoch
+        # stats = pickle.loads(loaded_data["stats"])
+        # print(f"   => resuming from epoch {stats.epoch}.")
+        # optimizer_state_dict = loaded_data["optimizer"]
+        # start_epoch = stats.epoch
 
     # Initialize the optimizer.
     optimizer = torch.optim.Adam(
@@ -160,9 +162,9 @@ def main(cfg: DictConfig):
     )
     err = torch.nn.MSELoss()
     if cfg.optimizer.ce_weight_zero:
-        w = torch.ones(cfg.cross_entropy.bins, device=device)
-        w[0] /= 100
-        CE.weight = w
+        w_bins = torch.ones(cfg.cross_entropy.bins, device=device)
+        w_bins[0] /= 100
+        CE.weight = w_bins
 
     # err = torch.nn.L1Loss(reduction='sum')
     # Set the model to the training mode.
@@ -236,6 +238,42 @@ def main(cfg: DictConfig):
                 loss = [CE(ext_est,
                            to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins))
                                                              for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'CE_smooth':
+                loss = [CE(ext_est,
+                           to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins,
+                                       smoothing_std=cfg.cross_entropy.smoothing_std))
+                                                             for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'EMD2':
+                gt_ind = to_discrete(out["volume"][0], cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins)
+                bin_values = torch.linspace(cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins, device=device)
+                bias = 1
+                D = (gt_ind[...,None] - bin_values).abs() + bias
+
+                # pred_prob = torch.exp(out["output"][0]) / (torch.exp(out["output"][0]).sum(-1)[..., None] + 1e-20)
+                discrete_pred = out["output"][0].double()
+                with torch.no_grad():
+                    d = discrete_pred.mean(-1)[..., None]
+                    discrete_pred -= d
+                pred_prob = torch.exp(discrete_pred) / (torch.exp(discrete_pred).sum(-1)[..., None] + 1e-20)
+                loss = ((pred_prob) * D).sum(-1)  #/ D.shape[-1]
+                loss *= w_bins[gt_ind]
+                loss = [loss]
+            elif cfg.optimizer.loss == 'EMD':
+                gt_ind = to_discrete(out["volume"][0], cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins)
+                discrete_pred = out["output"][0].double()
+                pred_cdf = torch.cumsum(torch.exp(discrete_pred),-1)
+                pred_cdf /= (pred_cdf[:,-1][:,None] + 1e-20)
+                bin_values = torch.linspace(cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins, device=device).repeat(pred_cdf.shape[0], 1)
+                delta = (cfg.cross_entropy.max - cfg.cross_entropy.min) / (cfg.cross_entropy.bins - 1)
+                gt_disc = gt_ind * delta
+                gt_cdf = (bin_values >= gt_disc[:, None]) * 1.0
+                # with torch.no_grad():
+                #     d = discrete_pred.mean(-1)[..., None]
+                #     discrete_pred -= d
+                # pred_prob = torch.exp(discrete_pred) / (torch.exp(discrete_pred).sum(-1)[..., None] + 1e-20)
+                loss = ((pred_cdf - gt_cdf)**2).sum(-1)  #/ D.shape[-1]
+                loss *= w_bins[gt_ind]
+                loss = [loss]
 
             else:
                 NotImplementedError
@@ -255,7 +293,7 @@ def main(cfg: DictConfig):
                     out["output"] = [ext_est.reshape(-1,3,3,3)[:,1,1,1] for ext_est in out["output"]]
                     out["volume"] = [ext_gt.reshape(-1, 3, 3, 3)[:, 1, 1, 1] for ext_gt in out["volume"]]
 
-                if cfg.optimizer.loss == 'CE':
+                if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
                     out["output"] = get_pred_from_discrete(out["output"], cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins)
                 relative_err = [relative_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]#torch.norm(out["output"] - out["volume"],p=1,dim=-1) / (torch.norm(out["volume"],p=1,dim=-1) + 1e-6)
                 relative_err = torch.tensor(relative_err).mean()
@@ -310,7 +348,7 @@ def main(cfg: DictConfig):
                             val_volume,
                             masks
                         )
-                        if cfg.optimizer.loss == 'CE':
+                        if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
                             val_out["output"] = get_pred_from_discrete(val_out["output"], cfg.cross_entropy.min,
                                                                   cfg.cross_entropy.max, cfg.cross_entropy.bins)
 

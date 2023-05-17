@@ -23,12 +23,29 @@ def to_onehot(gt, min, max, bins):
     one_hot = F.one_hot(index, bins).float()
     return one_hot
 
-def to_discrete(gt, min, max, bins):
-    # one_hot = torch.zeros((gt.shape[0],bins),device=gt.device)
-    delta = (max - min)/(bins-1)
+def to_discrete(gt, min, max, bins, smoothing_std=None):
+    delta = (max - min) / (bins - 1)
     index = torch.round(gt / delta).long()
-    index[index>(bins-1)] = bins-1
-    return index
+    index[index > (bins - 1)] = bins - 1
+    if smoothing_std is None or smoothing_std==0:
+        return index
+    else:
+        variance = torch.square(torch.tensor(smoothing_std))
+        m = int(5*smoothing_std)
+        x = torch.arange(-m, m+1, 1, device=index.device)
+        f = torch.exp(-x**2 / (2 * variance)) / (torch.sqrt(2 * torch.pi * variance))
+        gt_probs = []
+        for i in index:
+            gt_prob = torch.zeros(bins,device=index.device)
+            new_ind = i+x
+            mask_ind = torch.logical_and(new_ind>=0, new_ind < bins)
+            try:
+                gt_prob[new_ind[mask_ind]] = f[mask_ind]
+            except:
+                pass
+            gt_prob /= gt_prob.sum()
+            gt_probs.append(gt_prob)
+        return torch.stack(gt_probs)
 
 def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='max', conf_type='prob',prob_gain=10):
     preds = []
@@ -97,11 +114,16 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             prob_values, indices = torch.topk(prob2,2,dim=1)
             ext_bin_values = bin_values[indices] / bin_values[-1]
             confidence = torch.squeeze(torch.diff(prob_values,1)**2 + (torch.diff(ext_bin_values,1))**2)
+        elif conf_type=='entropy':
+            with torch.no_grad():
+                confidence = 1 - (prob * torch.log2(prob)).sum(-1) / (torch.log2(1 / torch.tensor(bins)))
+
         elif conf_type =='std':
             weighted_bins = prob * bin_values
             avg = weighted_bins.sum(-1)
             std = ((prob*(bin_values.repeat(avg.shape[0], 1) - avg[...,None])**2).sum(-1) )**0.5
-            confidence = (prob.shape[1] - std*2) / prob.shape[1]
+            # confidence = (prob.shape[1]/2 - std*2) / (prob.shape[1]/2)
+            confidence = 1 / (std*2+1e-6) - 1e-6
         elif conf_type =='conf_interval':
             conf_interval = torch.zeros_like(pred)
             # cum_prob = prob.gather(-1, i_max[...,None]).squeeze()
@@ -199,8 +221,6 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
         confidences.append(confidence.float())
 
     return preds, confidences, probs
-
-
 
 
 def get_pred_from_discrete(discrete_preds, min, max, bins, pred_type='max'):

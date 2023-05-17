@@ -6,7 +6,6 @@ import pylab as py
 import pickle
 import pandas as pd
 import matplotlib.pyplot as plt
-
 def load_from_csv_shdom(path, density=None, origin=(0.0,0.0)):
 
     df = pd.read_csv(path, comment='#', skiprows=3, delimiter=' ')
@@ -43,9 +42,7 @@ def load_from_csv(path, density=None, origin=(0.0,0.0)):
     df = pd.read_csv(path, comment='#', skiprows=4, index_col=['x', 'y', 'z'])
     nx, ny, nz = np.genfromtxt(path, skip_header=1, max_rows=1, dtype=int, delimiter=',')
     dx, dy = np.genfromtxt(path, max_rows=1, dtype=float, skip_header=2, delimiter=',')
-    # zz= np.array([0.000,0.040,0.080,0.120,0.160,0.200,0.240,0.280,0.320,0.360,0.400,0.440,0.480,0.520,0.560,0.600,0.640,0.680,0.720,0.760,0.800,0.840,0.880,0.920,0.960,1.000,1.040,1.080,1.120,1.160,1.200,1.240])
     z = xr.DataArray(np.genfromtxt(path, max_rows=1, dtype=float, skip_header=3, delimiter=','), coords=[range(nz)], dims=['z'])
-    # z = xr.DataArray(zz, coords=[range(nz)], dims=['z'])
 
     dset = at3d.grid.make_grid(dx, nx, dy, ny, z)
     i, j, k = zip(*df.index)
@@ -76,7 +73,7 @@ def get_projections(cfg=None):
     #     path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
 
     path = '/wdata/roironen/Data/BOMEX_128x128x100_50CCN_50m_micro_256/10cameras_20m/shdom_projections.pkl'
-    path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
+    # path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
 
     with open(path, 'rb') as pickle_file:
         projection_list = pickle.load(pickle_file)['projections']
@@ -217,7 +214,9 @@ def get_projections(cfg=None):
     return sensor_dict
 
 ### Make the RTE grid and medium microphysics.
-cloud_scatterer = load_from_csv('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/cloud64785.txt',
+# cloud_scatterer = load_from_csv('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/cloud64785.txt',
+#                                            density='lwc',origin=(0.0,0.0))
+cloud_scatterer = load_from_csv('/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras_20m/cloud0.txt',
                                            density='lwc',origin=(0.0,0.0))
 
 #load atmosphere
@@ -230,7 +229,7 @@ merged_z_coordinate = at3d.grid.combine_z_coordinates([reduced_atmosphere,cloud_
 # define the property grid - which is equivalent to the base RTE grid
 rte_grid = at3d.grid.make_grid(cloud_scatterer.x.diff('x')[0],cloud_scatterer.x.data.size,
                           cloud_scatterer.y.diff('y')[0],cloud_scatterer.y.data.size,
-                          cloud_scatterer.z.data)
+                          merged_z_coordinate)
 
 
 #finish defining microphysics because we can.
@@ -255,18 +254,21 @@ wavelengths = sensor_dict.get_unique_solvers()
 ### get optical property generators
 
 
-
-mie_mono_tables = OrderedDict()
-for wavelength in wavelengths:
-    mie_mono_tables[wavelength] = at3d.mie.get_mono_table(
-        'Water',(wavelength,wavelength),
-        max_integration_radius=120.0,
-        minimum_effective_radius=0.1,
-        relative_dir='../../AT3D/mie_tables',
-        verbose=True
-    )
-
-
+try:
+    with open('/wdata/roironen/Data/at3d_mie.pkl', 'rb') as f:
+        mie_mono_tables = pickle.load(f)
+except:
+    mie_mono_tables = OrderedDict()
+    for wavelength in wavelengths:
+        mie_mono_tables[wavelength] = at3d.mie.get_mono_table(
+            'Water',(wavelength,wavelength),
+            max_integration_radius=120.0,
+            minimum_effective_radius=0.1,
+            relative_dir='../../AT3D/mie_tables',
+            verbose=True
+        )
+    with open('/wdata/roironen/Data/at3d_mie.pkl', 'wb') as f:
+        pickle.dump(mie_mono_tables, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 optical_property_generator = at3d.medium.OpticalPropertyGenerator(
     'cloud',
@@ -275,6 +277,8 @@ optical_property_generator = at3d.medium.OpticalPropertyGenerator(
     reff=np.linspace(1.0,65.0,101),
     veff=np.linspace(0.01,0.4,101),
 )
+with open('/wdata/roironen/Data/at3d_optical_property_generator.pkl', 'wb') as f:
+    pickle.dump(optical_property_generator, f, protocol=pickle.HIGHEST_PROTOCOL)
 optical_properties = optical_property_generator(cloud_scatterer_on_rte_grid)
 
 
@@ -328,7 +332,7 @@ sensor_dict.get_measurements(solvers_dict, n_jobs=1, verbose=True)
 # line of apparent radiance.
 
 
-with open('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/train/cloud_results_64785.pkl', 'rb') as f:
+with open('/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras_20m/train/cloud_results_0.pkl', 'rb') as f:
     pyshdom_images = pickle.load(f)['images']
 
 for instrument in sensor_dict:
@@ -348,4 +352,4 @@ for instrument in sensor_dict:
 # as they are large.
 # See solver.save_solution / solver.load_solution() for how to save & load those RTE solutions.
 # Those functions are not yet integrated into util.save_forward_model / util.load_forward_model.
-at3d.util.save_forward_model('/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/at3d.nc', sensor_dict, solvers_dict)
+at3d.util.save_forward_model('/wdata/roironen/Data/BOMEX_256x256x100_5000CCN_50m_micro_256/10cameras_20m/at3d.nc', sensor_dict, solvers_dict)

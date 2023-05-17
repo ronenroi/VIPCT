@@ -330,7 +330,7 @@ class DiffRendererSHDOM(object):
         self.medium.compute_direct_derivative(self.rte_solver)
         self._num_parameters = self.medium.num_parameters
 
-    def render(self, cloud, mask, volume, gt_images):
+    def render(self, cloud, mask, volume, gt_images, confidence=None):
         """
         The objective function (cost) and gradient at the current state.
 
@@ -421,112 +421,112 @@ class DiffRendererSHDOM(object):
         self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
         self.images = images
         self.gt_images = gt_images
-        self.gradient = gradient
+        self.gradient = gradient if confidence is None else gradient * (1-confidence)
         l2_loss = self.loss_shdom(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
         return self.loss_operator(l2_loss)
 
-    def add_cloud(self, cloud_state, query_points, volume, gt_images):
-        """
-        The objective function (cost) and gradient at the current state.
-
-        Parameters
-        ----------
-        state: np.array(shape=(self.num_parameters, dtype=np.float64)
-            The current state vector
-
-        Returns
-        -------
-        loss: np.float64
-            The total loss accumulated over all pixels
-        gradient: np.array(shape=(self.num_parameters), dtype=np.float64)
-            The gradient of the objective function with respect to the state parameters
-
-        Notes
-        -----
-        This function also saves the current synthetic images for visualization purpose
-        """
-
-        cloud_state[cloud_state<self.min_bound] = self.min_bound
-        cloud_state[cloud_state>self.max_bound] = self.max_bound
-        gt_images = gt_images.squeeze() # view x H x W
-        gt_images *= self.image_std
-        gt_images += self.image_mean
-        gt_images = list(gt_images)
-        # gt_images = gt_images.cpu().numpy()
-        # mask_images = gt_images>0.02
-        # masked_proj_list =[]
-        # for proj, mask_image in zip(self.cameras.projection.projection_list, mask_images[0]):
-        #     masked_proj_list.append(proj[mask_image.ravel('F')])
-        #
-        # masked_camera = shdom.Camera(self.cameras.sensor, shdom.MultiViewProjection(masked_proj_list))
-        self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
-
-        cloud = np.zeros(volume.extinctions.numel())
-        cloud[query_points] = cloud_state.detach.cpu().numpy()
-        cloud = cloud.reshape(volume.extinctions.shape[2:])
-        cloud[0,:,:] = 0
-        cloud[-1,:,:] = 0
-        cloud[:, 0, :] = 0
-        cloud[:, -1, :] = 0
-        cloud[:, :,-1] = 0
-
-        mask = np.zeros(volume.extinctions.numel(), dtype=bool)
-        mask[query_points] = True
-        mask = mask.reshape(cloud.shape)
-
-        self.medium_list.append(self.get_medium_estimator(cloud,mask, volume))
-        # cloud_estimator = self.medium.scatterers['cloud']
-        # cloud_mask = shdom.GridData(cloud_estimator.grid, (mask.cpu().numpy()))
-        # cloud_estimator.set_mask(cloud_mask)
-        # self.init_optimizer()
-
-        # self.set_state(cloud_state)
-
-        # self._iteration += 1
-        gradient, loss, pixels = self.medium.compute_gradient(
-            rte_solvers=self.rte_solver,
-            measurements=self.measurements,
-            n_jobs=self.n_jobs
-        )
-        gt_images = np.array(gt_images)
-        images = np.array(pixels)
-        # images = []
-        # for im, im_gt,masked_im in zip(pixels,gt_images[0],mask_images[0]):
-        #     masked_image = np.zeros(im_gt.size)
-        #     masked_image[masked_im.ravel('F')] = im
-        #     images.append(masked_image.reshape(masked_im.shape).T)
-        # images = np.array(images)
-        # vmax = max(gt_images[5].max().item(),images[5].max())
-        # f, axarr = plt.subplots(1, 3)
-        # axarr[0].imshow(gt_images[5],vmin=0,vmax=vmax)
-        # axarr[1].imshow(images[5], vmin=0, vmax=vmax)
-        # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
-        # plt.show()
-
-        # plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
-        # plt.axis('square')
-        # plt.show()
-        # f, axarr = plt.subplots(3, len(images))
-        # for ax, image,gt in zip(axarr.T, images,gt_images):
-        #     ax[0].imshow(image)
-        #     ax[1].imshow(gt)
-        #     ax[2].imshow(np.abs(gt-image))
-        #     # ax.invert_xaxis()
-        #     # ax.invert_yaxis()
-        #     ax[0].axis('off')
-        #     ax[1].axis('off')
-        #     ax[2].axis('off')
-        # plt.title(f'loss={loss}')
-        # plt.tight_layout()
-        # plt.show()
-
-        # print(np.sum(np.array(gt_images)-images)**2)
-        self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
-        self.images = images
-        self.gt_images = gt_images
-        self.gradient = gradient
-        l2_loss = self.loss_shdom(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
-        return self.loss_operator(l2_loss)
+    # def add_cloud(self, cloud_state, query_points, volume, gt_images):
+    #     """
+    #     The objective function (cost) and gradient at the current state.
+    #
+    #     Parameters
+    #     ----------
+    #     state: np.array(shape=(self.num_parameters, dtype=np.float64)
+    #         The current state vector
+    #
+    #     Returns
+    #     -------
+    #     loss: np.float64
+    #         The total loss accumulated over all pixels
+    #     gradient: np.array(shape=(self.num_parameters), dtype=np.float64)
+    #         The gradient of the objective function with respect to the state parameters
+    #
+    #     Notes
+    #     -----
+    #     This function also saves the current synthetic images for visualization purpose
+    #     """
+    #
+    #     cloud_state[cloud_state<self.min_bound] = self.min_bound
+    #     cloud_state[cloud_state>self.max_bound] = self.max_bound
+    #     gt_images = gt_images.squeeze() # view x H x W
+    #     gt_images *= self.image_std
+    #     gt_images += self.image_mean
+    #     gt_images = list(gt_images)
+    #     # gt_images = gt_images.cpu().numpy()
+    #     # mask_images = gt_images>0.02
+    #     # masked_proj_list =[]
+    #     # for proj, mask_image in zip(self.cameras.projection.projection_list, mask_images[0]):
+    #     #     masked_proj_list.append(proj[mask_image.ravel('F')])
+    #     #
+    #     # masked_camera = shdom.Camera(self.cameras.sensor, shdom.MultiViewProjection(masked_proj_list))
+    #     self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
+    #
+    #     cloud = np.zeros(volume.extinctions.numel())
+    #     cloud[query_points] = cloud_state.detach.cpu().numpy()
+    #     cloud = cloud.reshape(volume.extinctions.shape[2:])
+    #     cloud[0,:,:] = 0
+    #     cloud[-1,:,:] = 0
+    #     cloud[:, 0, :] = 0
+    #     cloud[:, -1, :] = 0
+    #     cloud[:, :,-1] = 0
+    #
+    #     mask = np.zeros(volume.extinctions.numel(), dtype=bool)
+    #     mask[query_points] = True
+    #     mask = mask.reshape(cloud.shape)
+    #
+    #     self.medium_list.append(self.get_medium_estimator(cloud,mask, volume))
+    #     # cloud_estimator = self.medium.scatterers['cloud']
+    #     # cloud_mask = shdom.GridData(cloud_estimator.grid, (mask.cpu().numpy()))
+    #     # cloud_estimator.set_mask(cloud_mask)
+    #     # self.init_optimizer()
+    #
+    #     # self.set_state(cloud_state)
+    #
+    #     # self._iteration += 1
+    #     gradient, loss, pixels = self.medium.compute_gradient(
+    #         rte_solvers=self.rte_solver,
+    #         measurements=self.measurements,
+    #         n_jobs=self.n_jobs
+    #     )
+    #     gt_images = np.array(gt_images)
+    #     images = np.array(pixels)
+    #     # images = []
+    #     # for im, im_gt,masked_im in zip(pixels,gt_images[0],mask_images[0]):
+    #     #     masked_image = np.zeros(im_gt.size)
+    #     #     masked_image[masked_im.ravel('F')] = im
+    #     #     images.append(masked_image.reshape(masked_im.shape).T)
+    #     # images = np.array(images)
+    #     # vmax = max(gt_images[5].max().item(),images[5].max())
+    #     # f, axarr = plt.subplots(1, 3)
+    #     # axarr[0].imshow(gt_images[5],vmin=0,vmax=vmax)
+    #     # axarr[1].imshow(images[5], vmin=0, vmax=vmax)
+    #     # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
+    #     # plt.show()
+    #
+    #     # plt.scatter(np.array(gt_images).ravel(),np.array(images).ravel())
+    #     # plt.axis('square')
+    #     # plt.show()
+    #     # f, axarr = plt.subplots(3, len(images))
+    #     # for ax, image,gt in zip(axarr.T, images,gt_images):
+    #     #     ax[0].imshow(image)
+    #     #     ax[1].imshow(gt)
+    #     #     ax[2].imshow(np.abs(gt-image))
+    #     #     # ax.invert_xaxis()
+    #     #     # ax.invert_yaxis()
+    #     #     ax[0].axis('off')
+    #     #     ax[1].axis('off')
+    #     #     ax[2].axis('off')
+    #     # plt.title(f'loss={loss}')
+    #     # plt.tight_layout()
+    #     # plt.show()
+    #
+    #     # print(np.sum(np.array(gt_images)-images)**2)
+    #     self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
+    #     self.images = images
+    #     self.gt_images = gt_images
+    #     self.gradient = gradient
+    #     l2_loss = self.loss_shdom(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
+    #     return self.loss_operator(l2_loss)
 
 
 class DiffRendererSHDOM_Airmspi(object):
@@ -746,7 +746,7 @@ class DiffRendererSHDOM_Airmspi(object):
         self.medium.compute_direct_derivative(self.rte_solver)
         self._num_parameters = self.medium.num_parameters
 
-    def render(self, cloud, mask, volume, gt_images, shdom_proj_list):
+    def render(self, clouds, masks, volumes, gt_image_list, shdom_projections_list):
         """
         The objective function (cost) and gradient at the current state.
 
@@ -767,47 +767,51 @@ class DiffRendererSHDOM_Airmspi(object):
         This function also saves the current synthetic images for visualization purpose
         """
         # projections = self.get_projections(shdom_proj_path)
-        self.cameras = shdom.Camera(shdom.RadianceSensor(), shdom.MultiViewProjection(shdom_proj_list[0]))
+        state_gen_list = []
+        delayed_funcs = []
+        for cloud, mask, volume, gt_images, shdom_proj_list in zip(clouds, masks, volumes, gt_image_list, shdom_projections_list):
 
-        cloud[0,:,:] = 0
-        cloud[-1,:,:] = 0
-        cloud[:, 0, :] = 0
-        cloud[:, -1, :] = 0
-        cloud[:, :,-1] = 0
-        cloud[cloud<self.min_bound] = self.min_bound
-        cloud[cloud>self.max_bound] = self.max_bound
-        gt_images = gt_images.squeeze() # view x H x W
-        if len(gt_images.shape)==2:
-            gt_images=gt_images[None]
-        gt_images *= self.image_std
-        gt_images += self.image_mean
-        gt_images = list(gt_images)
-        # gt_images = gt_images.cpu().numpy()
-        # mask_images = gt_images>0.02
-        # masked_proj_list =[]
-        # for proj, mask_image in zip(self.cameras.projection.projection_list, mask_images[0]):
-        #     masked_proj_list.append(proj[mask_image.ravel('F')])
-        #
-        # masked_camera = shdom.Camera(self.cameras.sensor, shdom.MultiViewProjection(masked_proj_list))
-        self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
-        cloud_state = cloud[mask]
+            self.cameras = shdom.Camera(shdom.RadianceSensor(), shdom.MultiViewProjection(shdom_proj_list[0]))
 
-        self.medium = self.get_medium_estimator(cloud.detach().cpu().numpy(),mask.cpu().numpy().astype(bool), volume)
-        # cloud_estimator = self.medium.scatterers['cloud']
-        # cloud_mask = shdom.GridData(cloud_estimator.grid, (mask.cpu().numpy()))
-        # cloud_estimator.set_mask(cloud_mask)
-        self.init_optimizer()
+            cloud[0,:,:] = 0
+            cloud[-1,:,:] = 0
+            cloud[:, 0, :] = 0
+            cloud[:, -1, :] = 0
+            cloud[:, :,-1] = 0
+            cloud[cloud<self.min_bound] = self.min_bound
+            cloud[cloud>self.max_bound] = self.max_bound
+            gt_images = gt_images.squeeze() # view x H x W
+            if len(gt_images.shape)==2:
+                gt_images=gt_images[None]
+            gt_images *= self.image_std
+            gt_images += self.image_mean
+            gt_images = list(gt_images)
+            # gt_images = gt_images.cpu().numpy()
+            # mask_images = gt_images>0.02
+            # masked_proj_list =[]
+            # for proj, mask_image in zip(self.cameras.projection.projection_list, mask_images[0]):
+            #     masked_proj_list.append(proj[mask_image.ravel('F')])
+            #
+            # masked_camera = shdom.Camera(self.cameras.sensor, shdom.MultiViewProjection(masked_proj_list))
+            self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
+            cloud_state = cloud[mask]
 
-        self.set_state(cloud_state.detach().cpu().numpy())
+            self.medium = self.get_medium_estimator(cloud.detach().cpu().numpy(),mask.cpu().numpy().astype(bool), volume)
+            # cloud_estimator = self.medium.scatterers['cloud']
+            # cloud_mask = shdom.GridData(cloud_estimator.grid, (mask.cpu().numpy()))
+            # cloud_estimator.set_mask(cloud_mask)
+            self.init_optimizer()
 
-        # self._iteration += 1
-        gradient, loss, pixels = self.medium.compute_gradient(
-            rte_solvers=self.rte_solver,
-            measurements=self.measurements,
-            n_jobs=self.n_jobs
-        )
-        gt_images = np.array(gt_images)
-        images = np.array(pixels)
+            self.set_state(cloud_state.detach().cpu().numpy())
+
+            # self._iteration += 1
+            gradient, loss, pixels = self.medium.compute_gradient(
+                rte_solvers=self.rte_solver,
+                measurements=self.measurements,
+                n_jobs=self.n_jobs
+            )
+            gt_images = np.array(gt_images)
+            images = np.array(pixels)
         # images = []
         # for im, im_gt,masked_im in zip(pixels,gt_images[0],mask_images[0]):
         #     masked_image = np.zeros(im_gt.size)
@@ -820,27 +824,27 @@ class DiffRendererSHDOM_Airmspi(object):
         # axarr[1].imshow(images[5], vmin=0, vmax=vmax)
         # axarr[2].imshow(np.abs(gt_images[5] - images[5]))
         # plt.show()
-        mm = images>0.025
-        plt.imshow(mm[0])
-        plt.show()
-        rand_perm = np.random.permutation(mm.sum())[:2000]
-        plt.scatter(np.array(gt_images)[mm][rand_perm],np.array(images)[mm][rand_perm])
-        plt.axis('square')
-        plt.show()
-        f, axarr = plt.subplots(3, len(images))
-        if len(axarr.shape)==1:
-            axarr=axarr[:,None]
-        for ax, image,gt in zip(axarr.T, images,gt_images):
-            ax[0].imshow(image)
-            ax[1].imshow(gt)
-            ax[2].imshow(np.abs(gt-image))
-            # ax.invert_xaxis()
-            # ax.invert_yaxis()
-            ax[0].axis('off')
-            ax[1].axis('off')
-            ax[2].axis('off')
-        plt.tight_layout()
-        plt.show()
+        # mm = images>0.025
+        # plt.imshow(mm[0])
+        # plt.show()
+        # rand_perm = np.random.permutation(mm.sum())[:2000]
+        # plt.scatter(np.array(gt_images)[mm][rand_perm],np.array(images)[mm][rand_perm])
+        # plt.axis('square')
+        # plt.show()
+        # f, axarr = plt.subplots(3, len(images))
+        # if len(axarr.shape)==1:
+        #     axarr=axarr[:,None]
+        # for ax, image,gt in zip(axarr.T, images,gt_images):
+        #     ax[0].imshow(image)
+        #     ax[1].imshow(gt)
+        #     ax[2].imshow(np.abs(gt-image))
+        #     # ax.invert_xaxis()
+        #     # ax.invert_yaxis()
+        #     ax[0].axis('off')
+        #     ax[1].axis('off')
+        #     ax[2].axis('off')
+        # plt.tight_layout()
+        # plt.show()
 
         # print(np.sum(np.array(gt_images)-images)**2)
         self.loss = loss #/ np.sum(gt_images**2) #/ mask_images.sum()
@@ -850,4 +854,4 @@ class DiffRendererSHDOM_Airmspi(object):
         l2_loss = self.loss_shdom(cloud_state,self) #/ gt_images.size #/ np.sum(gt_images**2)
         return self.loss_operator(l2_loss)
 
-
+    # def parallel_render(self, cloud, mask, volume, gt_images, shdom_proj_list):

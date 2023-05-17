@@ -20,8 +20,8 @@ import hydra
 import numpy as np
 from VIPCT.VIPCT.util.visualization import SummaryWriter
 from VIPCT.dataloader.airmspi_dataset import get_airmspi_datasets, trivial_collate
-from VIPCT.CTnet import *
-from VIPCT.util.stats import Stats
+from VIPCT.VIPCT.CTnet import *
+from VIPCT.VIPCT.util.stats import Stats
 from omegaconf import DictConfig
 import torch
 from VIPCT.scene.cameras import AirMSPICameras
@@ -29,7 +29,7 @@ from VIPCT.scene.volumes import Volumes
 
 relative_error = lambda ext_est, ext_gt, eps=1e-6 : torch.norm(ext_est.view(-1) - ext_gt.view(-1),p=1) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../configs")
 
 
 @hydra.main(config_path=CONFIG_DIR, config_name="vip-ct_train_airmspi")

@@ -247,7 +247,7 @@ def main(cfg: DictConfig):
             print(mask_conf.sum())
             images = images.cpu().numpy()
             # print(est_vol[extinction[0]>0].mean().item())
-            loss = diff_renderer_shdom.render(est_vol, mask_conf, volume, images)
+            loss = diff_renderer_shdom.render(est_vol, mask_conf, images)
             # gt_vol = extinction[0]
             # M = masks[0].detach().cpu()
             # if conf_vol is not None:
@@ -275,7 +275,7 @@ def main(cfg: DictConfig):
 
 
             # torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.optimizer.clip)
-            if cfg.optimizer.loss_thr<loss:
+            if cfg.optimizer.loss_thr<diff_renderer_shdom.loss:
                 print("Images are too inconsistent, skip gradient update for stability")
                 continue
             loss.backward()
@@ -417,8 +417,6 @@ def main(cfg: DictConfig):
                 print(f"Storing checkpoint {curr_checkpoint_path}.")
                 data_to_store = {
                     "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "stats": pickle.dumps(stats),
                 }
                 torch.save(data_to_store, curr_checkpoint_path)
 

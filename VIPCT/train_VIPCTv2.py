@@ -303,7 +303,7 @@ def main(cfg: DictConfig):
             # Update stats with the current metrics.
             stats.update(
                 {"loss": float(loss), "relative_error": float(relative_err), "lr":  lr_scheduler.get_last_lr()[0],#optimizer.param_groups[0]['lr'],#lr_scheduler.get_last_lr()[0]
-                 "max_memory": float(round(torch.cuda.max_memory_allocated()/1e6))},
+                 "max_memory": float(round(torch.cuda.max_memory_allocated(device=device)/1e6))},
                 stat_set="train",
             )
 

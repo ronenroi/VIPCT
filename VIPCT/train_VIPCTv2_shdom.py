@@ -172,8 +172,8 @@ def main(cfg: DictConfig):
 
     if cfg.ct_net.stop_encoder_grad:
         for name, param in model.named_parameters():
-            # if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
-            if 'decoder' in name:
+            if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
+            # if 'decoder' in name:
                 param.requires_grad = True
             else:
                 param.requires_grad = False
@@ -305,7 +305,7 @@ def main(cfg: DictConfig):
             # Update stats with the current metrics.
             stats.update(
                 {"loss": float(loss), "relative_error": float(relative_err), "lr":  lr_scheduler.get_last_lr()[0],#optimizer.param_groups[0]['lr'],#lr_scheduler.get_last_lr()[0]
-                 "max_memory": float(round(torch.cuda.max_memory_allocated()/1e6))},
+                 "max_memory": float(round(torch.cuda.max_memory_allocated(device=device)/1e6))},
                 stat_set="train",
             )
 

@@ -31,7 +31,7 @@ from .noise import SatelliteNoise
 DEFAULT_DATA_ROOT = '/wdata/roironen/Data'
 
 
-ALL_DATASETS = ("Toy_10cameras_20m","Toy2_10cameras_20m","BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
+ALL_DATASETS = ("Toy_10cameras_20m","Toy2_10cameras_20m","Toy3_10cameras_20m","BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
                 "BOMEX_10cameras_50m", "BOMEX_32cameras_20m", "BOMEX_32cameras_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
                 "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds",
@@ -144,6 +144,9 @@ def get_cloud_datasets(
         elif dataset_name == 'Toy2_10cameras_20m':
             data_root = os.path.join(data_root, 'Toy2', '10cameras_20m')
             image_size = [116, 116]
+        elif dataset_name == 'Toy3_10cameras_20m':
+            data_root = os.path.join(data_root, 'Toy_single_voxel_clouds', '10cameras_20m')
+            image_size = [116, 116]
         else:
             FileNotFoundError()
 
@@ -243,6 +246,11 @@ class CloudDataset(Dataset):
             mask = data['mask_morph']
         elif self.mask_type == 'space_carving_0.9':
             mask = data['mask0.9']
+        elif self.mask_type == 'toy3':
+            mask = np.zeros((32*32*64)).astype(bool)
+            mask[data['index']] = True
+            mask = mask.reshape((32,32,64))
+            # images = images[:,:][None]
         if 'varying' in self.dataset_name:
             # randomly sample a perturbation out of the tenth simulated data
             index = torch.randperm(10)[0]
@@ -251,9 +259,10 @@ class CloudDataset(Dataset):
         else:
             cam_i = torch.arange(self.n_cam)
         images = images[cam_i]
-
+        if len(images.shape)==2:
+            images = images[None]
         if self.noise is not None:
-            self.noise.convert_radiance_to_graylevel(images)
+            images = self.noise.convert_radiance_to_graylevel(images)
 
         images -= self.mean
         images /= self.std

@@ -84,6 +84,14 @@ def get_pred_and_conf_from_discrete(discrete_preds, min, max, bins, pred_type='m
             pred = weighted_bins.sum(-1) # discrete_pred.sum(-1) should be 1
             # confidence = ((prob*(bin_values.repeat(pred.shape[0], 1) - pred[...,None])**2).sum(-1) / (prob.sum(-1)-1))**0.5
             # pred = torch.vstack((pred,pred_std)).T
+        elif pred_type == 'mean_ow_empty':
+            # prob[:,0] /= 100
+
+            weighted_bins = prob[:,1:] * bin_values[1:] / prob[:,1:].sum(-1)[...,None]
+            pred = weighted_bins.sum(-1) # discrete_pred.sum(-1) should be 1
+            pred[i_max==0] = 0
+            # confidence = ((prob*(bin_values.repeat(pred.shape[0], 1) - pred[...,None])**2).sum(-1) / (prob.sum(-1)-1))**0.5
+            # pred = torch.vstack((pred,pred_std)).T
         elif pred_type == 'differentiable_max':
             # prob[:,0] /= 100
             weights = prob**prob_gain

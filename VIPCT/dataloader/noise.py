@@ -1,11 +1,12 @@
 import numpy as np
 
 class SatelliteNoise(object):
-    def __init__(self, ):
+    def __init__(self, fullwell=13.5e3, bits=10,DARK_NOISE_std=13):
         GECKO = {'PIXEL_SIZE': 5.5, 'FULLWELL': 13.5e3, 'CHeight': 2048, 'CWidth': 2048,
                  'SENSOR_ID': 0, 'READOUT_NOISE': 13, 'DARK_CURRENT_NOISE': 125, 'TEMP': 25, 'BitDepth': 10}
-        self._bits = 10
-        self._fullwell = 13.5e3
+        self._bits = bits
+        self._fullwell = fullwell
+        self.DARK_NOISE_std = DARK_NOISE_std
         self._alpha = (2 ** self._bits) / self._fullwell
 
     def add_noise(self ,electrons_number_image):
@@ -22,10 +23,9 @@ class SatelliteNoise(object):
 
         # dark noise:
         DARK_NOISE_mean = 0#(self._DARK_NOISE *1e-6 * self._exposure_time)
-        DARK_NOISE_std = 13 # since itcomes from poisson distribution.
         DN_noise = np.random.normal(
             loc=DARK_NOISE_mean,
-            scale=DARK_NOISE_std
+            scale=self.DARK_NOISE_std
             ,  # The scale parameter controls the standard deviation of the normal distribution.
             size=electrons_number.shape
         ).astype(np.int)
@@ -99,3 +99,4 @@ class SatelliteNoise(object):
 
 
         return np.array(noisy_images)
+

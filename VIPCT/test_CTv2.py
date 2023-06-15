@@ -224,9 +224,9 @@ def main(cfg: DictConfig):
                 xv, yv, zv = np.meshgrid(np.linspace(0, gt_vol.shape[0],
                                                      gt_vol.shape[0]),np.linspace(0, gt_vol.shape[1], gt_vol.shape[1]),
                                          np.linspace(0, gt_vol.shape[2], gt_vol.shape[2]))
-                plt.scatter(gt_vol[est_vols>1].ravel().cpu(), est_vols[est_vols>1].ravel().cpu(),c=torch.log(conf_vol[est_vols>1].ravel().cpu()))
+                plt.scatter(gt_vol[masks[0]].ravel().cpu(), est_vols[masks[0]].ravel().cpu(),c=torch.log(conf_vol[masks[0]].ravel().cpu()))
                 plt.colorbar()
-                plt.plot([0,gt_vol[est_vols>1].ravel().cpu().max()],[0,gt_vol[est_vols>1].ravel().cpu().max()],'r')
+                plt.plot([0,gt_vol[masks[0]].ravel().cpu().max()],[0,gt_vol[masks[0]].ravel().cpu().max()],'r')
                 plt.xlabel('gt')
                 plt.ylabel('est')
                 plt.axis('square')

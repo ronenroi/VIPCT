@@ -165,6 +165,26 @@ def main(cfg: DictConfig):
         w_bins = torch.ones(cfg.cross_entropy.bins, device=device)
         w_bins[0] /= 100
         CE.weight = w_bins
+    if not cfg.optimizer.ce_weight_zero and cfg.optimizer.BBSE_ratio:
+        from scipy.io import loadmat
+        prob_bomex_50_bomex_500 = loadmat('../../../matlab_script_v2/BOMEX500_BOMEX50_hist.mat')['ext'][0]
+        prob_bomax500 = prob_bomex_50_bomex_500[0]
+        prob_bomax500 = prob_bomax500[prob_bomax500>0]
+        delta_beta = (cfg.cross_entropy.max - cfg.cross_entropy.min) / (cfg.cross_entropy.bins-1)
+        bins = np.linspace(cfg.cross_entropy.min-delta_beta/2, cfg.cross_entropy.max+delta_beta/2, cfg.cross_entropy.bins+1)
+        hist_bomax500, bin_edges_bomax500 = np.histogram(prob_bomax500,bins=bins, density=True)
+
+        prob_bomax50 = prob_bomex_50_bomex_500[1]
+        prob_bomax50 = prob_bomax50[prob_bomax50 > 0]
+        hist_bomax50, bin_edges_bomax50 = np.histogram(prob_bomax50,bins=bins, density=True)
+
+        w_bins = hist_bomax50 / (hist_bomax500+1e-4)
+        w_bins[0] = 0
+        w_bins /= np.sum(w_bins)
+        w_bins *= cfg.cross_entropy.bins
+        w_bins[0] = cfg.optimizer.BBSE_weight_zero
+        CE.weight = torch.tensor(w_bins, device=device).float()
+
 
     # err = torch.nn.L1Loss(reduction='sum')
     # Set the model to the training mode.

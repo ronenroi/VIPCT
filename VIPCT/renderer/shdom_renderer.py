@@ -1,4 +1,5 @@
 import os, time
+from os.path import join
 import numpy as np
 import argparse
 import shdom
@@ -129,6 +130,9 @@ class DiffRendererSHDOM(object):
         self.min_bound = cfg.cross_entropy.min
         self.max_bound = cfg.cross_entropy.max
         self.use_forward_grid = cfg.shdom.use_forward_grid
+        self.use_forward_phase_albedo = cfg.shdom.use_forward_phase_albedo
+        if self.use_forward_phase_albedo:
+            self.forward_cloud_path = self.get_microphysics_path(cfg)
         self.mie_base_path = '../../../pyshdom/mie_tables/polydisperse/Water_<wavelength>nm.scat'
         self.add_rayleigh = cfg.shdom.add_rayleigh
 
@@ -148,6 +152,9 @@ class DiffRendererSHDOM(object):
         self.cloud_generator = CloudGenerator(self.args)
         self.table_path = self.mie_base_path.replace('<wavelength>', '{}'.format(shdom.int_round(self.wavelength)))
         self.cloud_generator.add_mie(self.table_path)
+        self.mie = shdom.MiePolydisperse()
+        self.mie.read_table(self.table_path)
+
         self.air_generator = AirGenerator(self.args) if AirGenerator is not None else None
 
 
@@ -161,6 +168,19 @@ class DiffRendererSHDOM(object):
     def get_grid(self, grid):
         grid = shdom.Grid(x=grid[0],y=grid[1],z=grid[2])
         return grid
+
+    def get_microphysics_path(self,cfg):
+        if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
+            NotImplementedError()
+            # return '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/shdom_projections2.pkl'
+        elif cfg.data.dataset_name == 'BOMEX_50CCN_10cameras_20m': #:or cfg.data.dataset_name == 'BOMEX_50CCN_aux_10cameras_20m' or cfg.data.dataset_name == 'BOMEX_10cameras_20m':
+            return '/wdata_visl/NEW_BOMEX/processed_split_BOMEX_32x32x64_50CCN_50m/train'
+        # elif cfg.data.dataset_name == 'HAWAII_2000CCN_10cameras_20m':
+        #     path = '/wdata/roironen/Data/HAWAII_2000CCN_32x32x64_50m/10cameras_20m/shdom_projections.pkl'
+        else:
+            NotImplementedError()
+        return None
+
 
     def get_rte_solver(self,cfg):
         if cfg.data.dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
@@ -193,7 +213,7 @@ class DiffRendererSHDOM(object):
 
 
 
-    def get_medium_estimator(self, cloud_extinction, mask, volume):
+    def get_medium_estimator(self, cloud_extinction, mask, volume, cloud_index):
         """
         Generate the medium estimator for optimization.
 
@@ -222,20 +242,32 @@ class DiffRendererSHDOM(object):
 
         # Define the known albedo and phase: either ground-truth or specified, but it is not optimized.
 
+        if self.use_forward_phase_albedo:
+            cloud = shdom.MicrophysicalScatterer()
+            cloud.load_from_csv(join(self.forward_cloud_path,f'cloud{cloud_index}.txt'))
+            # cloud.resample(grid)
+            cloud.reff.data[cloud.reff.data <=1] = 1
+            cloud.reff.data[cloud.reff.data >= 65] = 65
+            cloud.veff.data[cloud.veff.data <=0.01] = 0.01
+            cloud.veff.data[cloud.veff.data >= 0.4] = 0.4
+            cloud.add_mie(self.mie)
+            albedo = cloud.get_albedo(self.wavelength)
+            phase = cloud.get_phase(self.wavelength)
 
-        albedo = self.cloud_generator.get_albedo(self.wavelength, albedo_grid)
+        else:
+            albedo = self.cloud_generator.get_albedo(self.wavelength, albedo_grid)
 
-        path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/medium_3827.pkl'
-        medium = shdom.Medium()
-        medium.load(path)
+            path = '/wdata/roironen/Data/CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess/10cameras_20m/medium_3827.pkl'
+            medium = shdom.Medium()
+            medium.load(path)
 
 
-        cloud = medium.get_scatterer('cloud')
-        cloud.resample(grid)
-        cloud._reff = self.cloud_generator.get_reff(grid)
-        # medium.scatterers['cloud']._veff._data[:,:,:] = 0.01
-        cloud._veff._data[cloud_extinction>0] = self.cloud_generator.get_veff(grid)._data[cloud_extinction>0]
-        phase = cloud.get_phase(self.wavelength)
+            cloud = medium.get_scatterer('cloud')
+            cloud.resample(grid)
+            cloud._reff = self.cloud_generator.get_reff(grid)
+            # medium.scatterers['cloud']._veff._data[:,:,:] = 0.01
+            cloud._veff._data[cloud_extinction>0] = self.cloud_generator.get_veff(grid)._data[cloud_extinction>0]
+            phase = cloud.get_phase(self.wavelength)
 
         # phase = self.cloud_generator.get_phase(self.wavelength, mask=cloud_extinction>1.0, grid = phase_grid)
 
@@ -330,7 +362,7 @@ class DiffRendererSHDOM(object):
         self.medium.compute_direct_derivative(self.rte_solver)
         self._num_parameters = self.medium.num_parameters
 
-    def render(self, cloud, mask, volume, gt_images, confidence=None):
+    def render(self, cloud, mask, volume, gt_images, confidence=None, cloud_index=None):
         """
         The objective function (cost) and gradient at the current state.
 
@@ -371,7 +403,7 @@ class DiffRendererSHDOM(object):
         self.measurements = shdom.Measurements(self.cameras,images=gt_images,wavelength=self.wavelength)
         cloud_state = cloud[mask]
 
-        self.medium = self.get_medium_estimator(cloud.detach().cpu().numpy(),mask.cpu().numpy(), volume)
+        self.medium = self.get_medium_estimator(cloud.detach().cpu().numpy(),mask.cpu().numpy(), volume, cloud_index)
         # cloud_estimator = self.medium.scatterers['cloud']
         # cloud_mask = shdom.GridData(cloud_estimator.grid, (mask.cpu().numpy()))
         # cloud_estimator.set_mask(cloud_mask)

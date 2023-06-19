@@ -4,11 +4,15 @@ hydra:
 seed: 3
 debug: False
 gpu: 3
-save_results: False
+save_results: True
 show: False
 mode: train
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-05-27_Train_TOY3_1views/10-23-42/checkpoints/cp_180000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-14_Train_BOMEX_500_BBSE_ratio_resume_original/19-45-46/checkpoints/cp_95000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-14_Train_BOMEX_500_BBSE_ratio_resume_original/19-45-46/checkpoints/cp_95000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-15_Train_BOMEX_500_BBSE_ratio_BBSE_weight_zero_3_resume_original/13-35-51/checkpoints/cp_70000.pth'
+#checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-15_Train_BOMEX_500_BBSE_ratio_BBSE_weight_zero_10_resume_original/10-21-52/checkpoints/cp_90000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-06_FT_BOMEX_50CCN_10cameras_20m_V2_LR5.0e-06/20-25-06/checkpoints/cp_1100.pth'
+
 #/wdata/roironen/Deploy/VIPCT/outputs/2023-06-14_Train_BOMEX_500_BBSE_ratio_resume_original/15-42-49/checkpoints/cp_120000.pth
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-10_FT_BOMEX50CCN_BOMEX_50CCN_10cameras_20m_V1_LR5.0e-06_EVALadded/20-48-35/checkpoints/cp_50.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-05-25_Train_TOY3/16-14-06/checkpoints/cp_165000.pth'

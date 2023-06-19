@@ -215,7 +215,7 @@ def main(cfg: DictConfig):
                                              device=device)
 
             else:
-                images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
+                images, extinction, grid, image_sizes, projection_matrix, camera_center, masks, _ = batch#[0]#.values()
                 cameras = PerspectiveCameras(image_size=image_sizes,
                                              P=torch.tensor(projection_matrix, device=device).float(),
                                              camera_center=torch.tensor(camera_center, device=device).float(),
@@ -349,7 +349,7 @@ def main(cfg: DictConfig):
 
                 # val_batch = next(val_dataloader.__iter__())
 
-                    val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch#[0]#.values()
+                    val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks, _ = val_batch#[0]#.values()
                     val_image = torch.tensor(val_image, device=device).float()
                     val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
                     val_camera = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),

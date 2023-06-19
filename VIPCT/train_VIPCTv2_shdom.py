@@ -172,8 +172,10 @@ def main(cfg: DictConfig):
 
     if cfg.ct_net.stop_encoder_grad:
         for name, param in model.named_parameters():
-            if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
-            # if 'decoder' in name:
+            # if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
+            if 'decoder' in name:
+            # if '.bn' in name:
+
                 param.requires_grad = True
             else:
                 param.requires_grad = False
@@ -202,7 +204,7 @@ def main(cfg: DictConfig):
                 # Adjust the learning rate.
                 lr_scheduler.step()
 
-            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
+            images, extinction, grid, image_sizes, projection_matrix, camera_center, masks, cloud_path = batch#[0]#.values()
             volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
 
             if model.mask_type == 'gt_mask':
@@ -251,7 +253,7 @@ def main(cfg: DictConfig):
             print(mask_conf.sum())
             images = images.cpu().numpy()
             # print(est_vol[extinction[0]>0].mean().item())
-            loss = diff_renderer_shdom.render(est_vol, mask_conf, volume, images)
+            loss = diff_renderer_shdom.render(est_vol, mask_conf, volume, images, cloud_index=cloud_path[0].split('cloud_results_')[-1].split('.pkl')[0])
             # gt_vol = extinction[0]
             # M = masks[0].detach().cpu()
             # if conf_vol is not None:
@@ -335,7 +337,7 @@ def main(cfg: DictConfig):
 
                 # val_batch = next(val_dataloader.__iter__())
 
-                    val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch#[0]#.values()
+                    val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks,_ = val_batch#[0]#.values()
                     val_image = torch.tensor(val_image, device=device).float()
                     val_volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(), 1), grid)
                     val_camera = PerspectiveCameras(image_size=image_sizes,P=torch.tensor(projection_matrix, device=device).float(),

@@ -3,15 +3,15 @@ hydra:
     dir: ../test_results/${now:%Y-%m-%d}_Test_CASS_Train_BOMEX500_V2/${now:%H-%M-%S}
 seed: 3
 debug: False
-gpu: 3
-save_results: True
+gpu: 0
+save_results: False
 show: False
 mode: train
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-05-27_Train_TOY3_1views/10-23-42/checkpoints/cp_180000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-14_Train_BOMEX_500_BBSE_ratio_resume_original/19-45-46/checkpoints/cp_95000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-15_Train_BOMEX_500_BBSE_ratio_BBSE_weight_zero_3_resume_original/13-35-51/checkpoints/cp_70000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-15_Train_BOMEX_500_BBSE_ratio_BBSE_weight_zero_10_resume_original/10-21-52/checkpoints/cp_90000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-06_FT_BOMEX_50CCN_10cameras_20m_V2_LR5.0e-06/20-25-06/checkpoints/cp_1100.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-25_FT_BOMEX50_Train=BOMEX500_v2_mode_train_lr5.0e-06train_decoder/11-10-51/checkpoints/cp_120.pth'
 
 #/wdata/roironen/Deploy/VIPCT/outputs/2023-06-14_Train_BOMEX_500_BBSE_ratio_resume_original/15-42-49/checkpoints/cp_120000.pth
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-10_FT_BOMEX50CCN_BOMEX_50CCN_10cameras_20m_V1_LR5.0e-06_EVALadded/20-48-35/checkpoints/cp_50.pth'
@@ -29,13 +29,14 @@ data:
 #  dataset_name: 'DYCOMS_RF02_50CCN_10cameras_20m'
   dataset_name: 'BOMEX_50CCN_10cameras_20m'
   n_val: -1
-  noise: False
+  noise: True
+  full_well_val: None
 
 ct_net:
   val_n_query: 1000
   val_mask_type: 'space_carving' # 'space_carving' 'gt_mask' None toy3
 #  query_point_val_method: 'all'
-  pred_type: 'max' #max
+  pred_type: 'differentiable_max' #max
   conf_type: 'std' #conf_interval prob std rel_prob
   decoder_batchify: True
 

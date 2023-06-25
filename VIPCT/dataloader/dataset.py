@@ -42,6 +42,7 @@ ALL_DATASETS = ("Toy_10cameras_20m","Toy2_10cameras_20m","Toy3_10cameras_20m","B
                 "HAWAII_2000CCN_10cameras_20m",
                 "DYCOMS_RF02_500CCN_10cameras_20m",
                 "DYCOMS_RF02_50CCN_10cameras_20m",
+                "BOMEX_5000CCN_new_10cameras_20m",
                 )
 
 
@@ -209,14 +210,15 @@ def get_cloud_datasets(
         mean=mean,
         std=std,
     dataset_name = dataset_names,
-        noise=cfg.data.noise
+        noise=cfg.data.noise,
+        full_well_val=cfg.data.full_well_val
 
     )
 
     val_dataset = CloudDataset(val_paths, n_cam=n_cam,
         rand_cam = rand_cam, mask_type=cfg.ct_net.val_mask_type, mean=mean, std=std,   dataset_name = dataset_name,
-        noise=cfg.data.noise
-
+        noise=cfg.data.noise,
+        full_well_val=cfg.data.full_well_val
 )
 
     return train_dataset, val_dataset
@@ -224,7 +226,7 @@ def get_cloud_datasets(
 
 class CloudDataset(Dataset):
     def __init__(self, cloud_dir, n_cam, rand_cam=False, transform=None, target_transform=None, mask_type=None, mean=0, std=1, dataset_name='',
-                 fix_grid=False, noise=False):
+                 fix_grid=False, noise=False, full_well_val=None):
         self.cloud_dir = cloud_dir
         self.transform = transform
         self.target_transform = target_transform
@@ -235,7 +237,8 @@ class CloudDataset(Dataset):
         self.std = std
         self.dataset_name = dataset_name
         self.fix_grid = fix_grid
-        self.noise = SatelliteNoise() if noise else None
+        self.noise = SatelliteNoise(full_well_val=full_well_val) if noise else None
+
     def __len__(self):
         return len(self.cloud_dir)
 

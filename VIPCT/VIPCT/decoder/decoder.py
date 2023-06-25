@@ -46,6 +46,7 @@ class Decoder(nn.Module):
         self.feature_flatten = feature_flatten
         out_size = 27 if use_neighbours else 1
         self.type = type
+        self.mask = False
         if type == 'FixCT':
             linear1 = torch.nn.Linear(latent_size, 2048)
             linear2 = torch.nn.Linear(2048, 512)
@@ -142,6 +143,24 @@ class Decoder(nn.Module):
             torch.nn.Linear(512, ce_bins),
             # torch.nn.Softmax(dim=-1)
             )
+        elif type == 'FixCTv4_CE_mask':
+
+            self.decoder = nn.Sequential(
+                torch.nn.Linear(latent_size, 2048),
+                torch.nn.ReLU(True),
+                MLPWithInputSkips2(
+                8,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                2048,  # self.harmonic_embedding.embedding_dim_xyz,
+                512,
+                input_skips=(5,),
+
+            ),
+
+            )
+            self.decoder_out = torch.nn.Linear(512, ce_bins)
+            self.mask_decoder = nn.Sequential(torch.nn.Linear(512, 1),torch.nn.Sigmoid())
+            self.mask = True
 
         elif type == 'FixCTv4_microphysics':
 
@@ -164,6 +183,9 @@ class Decoder(nn.Module):
             x = torch.mean(x,1)
         if self.feature_flatten:
             x = x.reshape(x.shape[0],-1)
+        if self.mask:
+            x = self.decoder(x)
+            return self.decoder_out(x), self.mask_decoder(x)
         return self.decoder(x)
 
     @classmethod

@@ -195,9 +195,9 @@ def main(cfg: DictConfig):
     volumes = []
     mask_list = []
     images_list = []
-
+    f_name_is_noise = 'no_noise' if (cfg.data.noise == 'None' or cfg.data.noise == False) else 'noise'
     for i, batch in enumerate(train_dataloader):
-        file_name = train_dataloader.dataset.cloud_dir[i].replace('train','pseudo_train')
+        file_name = train_dataloader.dataset.cloud_dir[i].replace('train',f'pseudo_train_{f_name_is_noise}')
         if os.path.exists(file_name):
             continue
         # lr_scheduler(None)
@@ -207,7 +207,7 @@ def main(cfg: DictConfig):
             # Adjust the learning rate.
             lr_scheduler.step()
 
-        images, extinction, grid, image_sizes, projection_matrix, camera_center, masks = batch#[0]#.values()
+        images, extinction, grid, image_sizes, projection_matrix, camera_center, masks, _ = batch#[0]#.values()
         volume = Volumes(torch.unsqueeze(torch.tensor(extinction, device=device).float(),1), grid)
 
         if model.mask_type == 'gt_mask':

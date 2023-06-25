@@ -1,13 +1,14 @@
 import numpy as np
 
 class SatelliteNoise(object):
-    def __init__(self, fullwell=13.5e3, bits=10,DARK_NOISE_std=13):
+    def __init__(self, fullwell=13.5e3, bits=10, DARK_NOISE_std=13, full_well_val=None):
         GECKO = {'PIXEL_SIZE': 5.5, 'FULLWELL': 13.5e3, 'CHeight': 2048, 'CWidth': 2048,
                  'SENSOR_ID': 0, 'READOUT_NOISE': 13, 'DARK_CURRENT_NOISE': 125, 'TEMP': 25, 'BitDepth': 10}
         self._bits = bits
         self._fullwell = fullwell
         self.DARK_NOISE_std = DARK_NOISE_std
         self._alpha = (2 ** self._bits) / self._fullwell
+        self._full_well_val = full_well_val
 
     def add_noise(self ,electrons_number_image):
         """
@@ -22,7 +23,7 @@ class SatelliteNoise(object):
         electrons_number = np.random.poisson(electrons_number)
 
         # dark noise:
-        DARK_NOISE_mean = 0#(self._DARK_NOISE *1e-6 * self._exposure_time)
+        DARK_NOISE_mean = 0 #(self._DARK_NOISE *1e-6 * self._exposure_time)
         DN_noise = np.random.normal(
             loc=DARK_NOISE_mean,
             scale=self.DARK_NOISE_std
@@ -71,7 +72,10 @@ class SatelliteNoise(object):
         """
 
         noisy_images = []
-        max_of_all_images = np.array(images).max()
+        if self._full_well_val is None or  self._full_well_val == 'None':
+            max_of_all_images = np.array(images).max()
+        else:
+            max_of_all_images = self._full_well_val
 
         gray_level_bound = 2 ** self._bits
 

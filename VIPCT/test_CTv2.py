@@ -119,7 +119,7 @@ def main(cfg: DictConfig):
 
     # Run the main training loop.
     for val_i, val_batch in enumerate(val_dataloader):
-        val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks = val_batch
+        val_image, extinction, grid, image_sizes, projection_matrix, camera_center, masks, _ = val_batch
         val_image = torch.tensor(np.array(val_image), device=device).float()
         val_volume = Volumes(torch.unsqueeze(torch.tensor(np.array(extinction), device=device).float(), 1), grid)
         val_camera = PerspectiveCameras(image_size=image_sizes, P=torch.tensor(projection_matrix, device=device).float(),

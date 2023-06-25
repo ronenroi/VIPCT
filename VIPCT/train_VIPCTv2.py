@@ -41,6 +41,8 @@ from VIPCT.scene.cameras import PerspectiveCameras
 # mass_error = lambda ext_est, ext_gt, eps=1e-6 : (torch.norm(ext_gt.view(-1),p=1) - torch.norm(ext_est.view(-1),p=1)) / (torch.norm(ext_gt.view(-1),p=1) + eps)
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 CE = torch.nn.CrossEntropyLoss(reduction='mean')
+CE_mask = torch.nn.BCELoss(reduction='mean')
+
 
 # def build_criterion(args):
 #     weight = torch.ones(args.num_classes)
@@ -107,7 +109,7 @@ def main(cfg: DictConfig):
     if cfg.resume and os.path.isfile(checkpoint_resume_path):
         print(f"Resuming from checkpoint {checkpoint_resume_path}.")
         loaded_data = torch.load(checkpoint_resume_path, map_location=device)
-        model.load_state_dict(loaded_data["model"])
+        model.load_state_dict(loaded_data["model"], strict=False)
         # stats = pickle.loads(loaded_data["stats"])
         # print(f"   => resuming from epoch {stats.epoch}.")
         # optimizer_state_dict = loaded_data["optimizer"]
@@ -163,9 +165,9 @@ def main(cfg: DictConfig):
     err = torch.nn.MSELoss()
     if cfg.optimizer.ce_weight_zero:
         w_bins = torch.ones(cfg.cross_entropy.bins, device=device)
-        w_bins[0] /= 100
+        w_bins[0] = cfg.optimizer.CE_weight_zero
         CE.weight = w_bins
-    if not cfg.optimizer.ce_weight_zero and cfg.optimizer.BBSE_ratio:
+    elif not cfg.optimizer.ce_weight_zero and cfg.optimizer.BBSE_ratio:
         from scipy.io import loadmat
         prob_bomex_50_bomex_500 = loadmat('../../../matlab_script_v2/BOMEX500_BOMEX50_hist.mat')['ext'][0]
         prob_bomax500 = prob_bomex_50_bomex_500[0]
@@ -182,7 +184,7 @@ def main(cfg: DictConfig):
         w_bins[0] = 0
         w_bins /= np.sum(w_bins)
         w_bins *= cfg.cross_entropy.bins
-        w_bins[0] = cfg.optimizer.BBSE_weight_zero
+        w_bins[0] = cfg.optimizer.CE_weight_zero
         CE.weight = torch.tensor(w_bins, device=device).float()
 
 
@@ -258,6 +260,12 @@ def main(cfg: DictConfig):
                 loss = [CE(ext_est,
                            to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins))
                                                              for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'CE_mask':
+                loss = [CE(ext_est,
+                           to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins))
+                                                             for ext_est, ext_gt in zip(out["output"], out["volume"])]
+                loss += [CE_mask(mask_est.squeeze(), (ext_gt>1).float())
+                        for mask_est, ext_gt in zip(out["output_mask"], out["volume"])]
             elif cfg.optimizer.loss == 'CE_smooth':
                 loss = [CE(ext_est,
                            to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins,
@@ -313,7 +321,7 @@ def main(cfg: DictConfig):
                     out["output"] = [ext_est.reshape(-1,3,3,3)[:,1,1,1] for ext_est in out["output"]]
                     out["volume"] = [ext_gt.reshape(-1, 3, 3, 3)[:, 1, 1, 1] for ext_gt in out["volume"]]
 
-                if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
+                if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_mask' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
                     out["output"] = get_pred_from_discrete(out["output"], cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins)
                 relative_err = [relative_error(ext_est=ext_est,ext_gt=ext_gt) for ext_est, ext_gt in zip(out["output"], out["volume"])]#torch.norm(out["output"] - out["volume"],p=1,dim=-1) / (torch.norm(out["volume"],p=1,dim=-1) + 1e-6)
                 relative_err = torch.tensor(relative_err).mean()
@@ -368,7 +376,7 @@ def main(cfg: DictConfig):
                             val_volume,
                             masks
                         )
-                        if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
+                        if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_mask' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
                             val_out["output"] = get_pred_from_discrete(val_out["output"], cfg.cross_entropy.min,
                                                                   cfg.cross_entropy.max, cfg.cross_entropy.bins)
 

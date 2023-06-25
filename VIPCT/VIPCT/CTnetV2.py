@@ -112,6 +112,7 @@ class CTnetV2(torch.nn.Module):
             embed_camera_center = torch.chunk(embed_camera_center, n_chunk, dim=1) if embed_camera_center is not None else None
 
         output = [torch.empty(0, device=image_features[0].device)] * len(n_query)
+        output_mask = None
         for chunk in range(n_chunk):
             uv_chunk = [p[chunk] for p in uv]
             n_split = [points.shape[1] for points in uv_chunk]
@@ -137,7 +138,12 @@ class CTnetV2(torch.nn.Module):
             del latent_chunk
             # with torch.cuda.device(device=image_features[0].device):
             #     torch.cuda.empty_cache()
-
+            if self.decoder.mask:
+                if output_mask is None:
+                    output_mask = [torch.empty(0, device=image_features[0].device)] * len(n_query)
+                output_chunk_mask = torch.split(output_chunk[1], n_split)
+                output_mask = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output_mask, output_chunk_mask)]
+                output_chunk = output_chunk[0]
             output_chunk = torch.split(output_chunk, n_split)
             output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
         return output
@@ -295,13 +301,16 @@ class CTnetV2(torch.nn.Module):
                     output = self.decoder(latent,None,None,seq_padded,None,training_seq=True)
 
                 output = output.reshape(-1,output.shape[-1])
-
-            output = torch.split(output, n_query)
-            out = {"output": output, "volume": volume}
+            if self.decoder.mask:
+                output_mask = torch.split(output[1], n_query)
+                output = torch.split(output[0], n_query)
+                out = {"output": output, "output_mask": output_mask, "volume": volume}
+            else:
+                output = torch.split(output, n_query)
+                out = {"output": output, "volume": volume}
         else:
             assert Vbatch == 1
             output = self.batchify(image_features, embed_camera_center, query_points, uv, n_query)
-
             out = {"output": output, "volume": volume, 'query_indices': query_indices}
         return out
 

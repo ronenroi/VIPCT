@@ -137,8 +137,8 @@ class DiffRendererSHDOM(object):
         self.add_rayleigh = cfg.shdom.add_rayleigh
 
         parser = argparse.ArgumentParser()
-        # CloudGenerator = getattr(shdom.generate, 'Homogenous')
-        CloudGenerator = Monotonous
+        CloudGenerator = shdom.generate.Homogeneous #getattr(shdom.generate.Homogeneous, 'Homogenous')
+        # CloudGenerator = Monotonous
         parser = CloudGenerator.update_parser(parser)
 
         AirGenerator = None

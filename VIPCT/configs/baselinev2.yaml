@@ -4,11 +4,11 @@ version: 'V2'
 
 data:
   n_cam: 10
-  noise: True
+  noise: False
   mean: 0.017
   std: 0.0072
   rand_cam: False
-
+  full_well_val: None
 
 optimizer:
   max_epochs: 100000

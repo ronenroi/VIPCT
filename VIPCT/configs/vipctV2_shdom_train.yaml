@@ -3,7 +3,7 @@ defaults:
 
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_FT_BOMEX50_Train=BOMEX500_v2_mode_train_lr1.0e-05train_decoder/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_FT_BOMEX50_Train=BOMEX50_pseudo_v2_mode_train_lr5.0e-05train_decoder/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_tmp/${now:%H-%M-%S}
 
 resume: True
@@ -13,10 +13,10 @@ checkpoint_iteration_interval: 10
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_V1_noise/14-16-49/checkpoints/cp_230000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_50CCN_10cameras_20m_V1_noise/14-15-58/checkpoints/cp_225000.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2022-03-31_BOMEX_Res50_FPN_512channels_Sampl_3_9_10cams_L2_relative_LR5.0e-05_FixCTv4_wd1.0e-05_n_sampling_nets10/00-36-48/checkpoints/cp_130000.pth'
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-25_FT_BOMEX50_Train=BOMEX500_v2_mode_train_lr5.0e-06train_decoder/11-10-51/checkpoints/cp_120.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-27_PSEUDO_BOMEX_50CCN_10cameras_20m_CE_noise_TRUE_full_well_val_None_CE_weight_zero_1_lr_5.0e-05/09-42-06/checkpoints/cp_7500.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-06_FT_BOMEX_50CCN_10cameras_20m_V2_LR5.0e-06/20-25-06/checkpoints/cp_1100.pth'
 #checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_CE_noise/14-14-03/checkpoints/cp_230000.pth'
-gpu: 2
+gpu: 0
 
 data:
   dataset_name: 'BOMEX_50CCN_10cameras_20m' #'HAWAII_2000CCN_10cameras_20m' BOMEX_10cameras_20m#'BOMEX_50CCN_10cameras_20m' #'CASS_600CCN_roiprocess_10cameras_20m'
@@ -26,7 +26,7 @@ data:
 
 
 optimizer:
-  lr: 1.0e-05
+  lr: 5.0e-05
   wd: 1.0e-05
   ce_weight_zero: False
   loss: 'L2' #'L2_relative_error' # 'CE'

@@ -4,14 +4,14 @@ defaults:
 
 hydra:
   run:
-    dir: ../outputs/${now:%Y-%m-%d}_BOMEX_5000CCN_new_10cameras_20m_CE_noise_TRUE_full_well_val_None_CE_weight_zero_1_ADDMASKLOSS/${now:%H-%M-%S}
+    dir: ../outputs/${now:%Y-%m-%d}_PSEUDO_BOMEX_50CCN_10cameras_20m_CE_noise_TRUE_full_well_val_None_CE_weight_zero_1_lr_1.0e-05/${now:%H-%M-%S}
 #    dir: ../outputs/${now:%Y-%m-%d}_Tmp/${now:%H-%M-%S}
-
+#
 resume: True
 stats_print_interval: 25
 validation_iter_interval: 250
 checkpoint_iteration_interval: 2500
-checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-04-05_BOMEX_500CCN_10cameras_20m_CE_noise/14-14-03/checkpoints/cp_230000.pth'
+checkpoint_resume_path: '/wdata/roironen/Deploy/VIPCT/outputs/2023-06-27_PSEUDO_BOMEX_50CCN_10cameras_20m_CE_noise_TRUE_full_well_val_None_CE_weight_zero_1_lr_5.0e-05/09-42-06/checkpoints/cp_7500.pth'
 gpu: 0
 #ALL_DATASETS = ("Toy_10cameras_20m","Toy2_10cameras_20m","BOMEX_CASS_10cameras_20m", "CASS_10cameras_20m", "CASS_10cameras_50m", "BOMEX_10cameras_20m",''
 #                "BOMEX_10cameras_50m", "BOMEX_32cameras_20m", "BOMEX_32cameras_50m", "BOMEX_10cameras_20m_varying_S", "BOMEX_10cameras_20m_varying_M",
@@ -25,7 +25,7 @@ gpu: 0
 #                "DYCOMS_RF02_50CCN_10cameras_20m",
 #                )
 data:
-  dataset_name: BOMEX_5000CCN_new_10cameras_20m #['CASS_600CCN_roiprocess_10cameras_20m','HAWAII_2000CCN_10cameras_20m','BOMEX_50CCN_10cameras_20m','BOMEX_10cameras_20m']
+  dataset_name: BOMEX_50CCN_10cameras_20m_pseudo_label_noise #['CASS_600CCN_roiprocess_10cameras_20m','HAWAII_2000CCN_10cameras_20m','BOMEX_50CCN_10cameras_20m','BOMEX_10cameras_20m']
   #['CASS_600CCN_roiprocess_10cameras_20m','HAWAII_2000CCN_10cameras_20m','BOMEX_50CCN_10cameras_20m','BOMEX_10cameras_20m'] #'CASS_600CCN_roiprocess_10cameras_20m'
   n_training: -1
   n_val: 40
@@ -33,12 +33,12 @@ data:
   full_well_val: None
 
 optimizer:
-  lr: 5.0e-05
+  lr: 1.0e-05
   wd: 1.0e-05
-  loss: 'CE_mask' #'L2_relative_error' # 'CE'
+  loss: 'CE' #'L2_relative_error' # 'CE'
   ce_weight_zero: True
   BBSE_ratio: False
-  CE_weight_zero: 0.1
+  CE_weight_zero: 1
 
 ct_net:
   n_query: 500
@@ -50,7 +50,6 @@ cross_entropy:
   min: 0
   max: 300
   bins: 301
-  smoothing_std: None #2
 
 decoder:
-  name: 'FixCTv4_CE_mask' #'CE' #FixCTv4_CE
+  name: 'FixCTv4_CE' #'CE' #FixCTv4_CE

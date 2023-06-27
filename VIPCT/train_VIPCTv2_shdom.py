@@ -173,7 +173,7 @@ def main(cfg: DictConfig):
     if cfg.ct_net.stop_encoder_grad:
         for name, param in model.named_parameters():
             # if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
-            if 'decoder' in name:
+            if 'decoder' in name and not 'mask_decoder' in name:
             # if '.bn' in name:
 
                 param.requires_grad = True

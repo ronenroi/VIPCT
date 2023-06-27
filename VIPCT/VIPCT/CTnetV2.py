@@ -146,6 +146,8 @@ class CTnetV2(torch.nn.Module):
                 output_chunk = output_chunk[0]
             output_chunk = torch.split(output_chunk, n_split)
             output = [torch.cat((out_i, out_chunk_i)) for out_i, out_chunk_i in zip(output, output_chunk)]
+        if self.decoder.mask:
+            return output, output_mask
         return output
 
     def batchify_transformer(self, image_features, embed_camera_center, query_points, uv, n_query, z_size=32):
@@ -292,7 +294,7 @@ class CTnetV2(torch.nn.Module):
                 if self.train_mode_seq_iter<self.iter:
                     seq = volume[0].reshape(int(n_query[0]/32),32)
                     seq = torch.round(seq)
-                    seq[seq>300] =300
+                    seq[seq>300] = 300
                     seq_padded = torch.ones_like(seq) * 301 #0-300 cloud values, 301 is bos
                     seq_padded[:, 1:] = seq[:, :-1]
                     output = self.decoder(latent,None,None,seq_padded,None)
@@ -310,8 +312,12 @@ class CTnetV2(torch.nn.Module):
                 out = {"output": output, "volume": volume}
         else:
             assert Vbatch == 1
-            output = self.batchify(image_features, embed_camera_center, query_points, uv, n_query)
-            out = {"output": output, "volume": volume, 'query_indices': query_indices}
+            if self.decoder.mask:
+                output, output_mask = self.batchify(image_features, embed_camera_center, query_points, uv, n_query)
+                out = {"output": output, "output_mask": output_mask, "volume": volume, 'query_indices': query_indices}
+            else:
+                output = self.batchify(image_features, embed_camera_center, query_points, uv, n_query)
+                out = {"output": output, "volume": volume, 'query_indices': query_indices}
         return out
 
 

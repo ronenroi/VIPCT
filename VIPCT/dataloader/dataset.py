@@ -36,7 +36,8 @@ ALL_DATASETS = ("Toy_10cameras_20m","Toy2_10cameras_20m","Toy3_10cameras_20m","B
                 "BOMEX_10cameras_20m_varying_L", "BOMEX_10cameras_20m_varying_XL",
                 "subset_of_seven_clouds",
                 "BOMEX_50CCN_10cameras_20m",
-                "BOMEX_50CCN_10cameras_20m_pseudo_label",
+                "BOMEX_50CCN_10cameras_20m_pseudo_label_no_noise",
+                "BOMEX_50CCN_10cameras_20m_pseudo_label_noise",
                 "BOMEX_50CCN_aux_10cameras_20m",
                 'CASS_600CCN_roiprocess_10cameras_20m',
                 "HAWAII_2000CCN_10cameras_20m",
@@ -121,7 +122,10 @@ def get_cloud_datasets(
         elif dataset_name == 'BOMEX_50CCN_10cameras_20m':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
-        elif dataset_name == 'BOMEX_50CCN_10cameras_20m_pseudo_label':
+        elif dataset_name == 'BOMEX_50CCN_10cameras_20m_pseudo_label_no_noise':
+            data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
+            image_size = [116, 116]
+        elif dataset_name == 'BOMEX_50CCN_10cameras_20m_pseudo_label_noise':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
         elif dataset_name == 'BOMEX_50CCN_aux_10cameras_20m':
@@ -157,8 +161,10 @@ def get_cloud_datasets(
 
         if not dataset_name == 'BOMEX_CASS_10cameras_20m':
             print(f"Loading dataset {dataset_name}, image size={str(image_size)} ...")
-            if 'pseudo_label' in dataset_name:
-                data_train_path = [f for f in glob.glob(os.path.join(data_root, "pseudo_train/cloud*.pkl"))]
+            if 'pseudo_label_noise' in dataset_name:
+                data_train_path = [f for f in glob.glob(os.path.join(data_root, "pseudo_train_noise/cloud*.pkl"))]
+            elif 'pseudo_label_no_noise' in dataset_name:
+                data_train_path = [f for f in glob.glob(os.path.join(data_root, "pseudo_train_no_noise/cloud*.pkl"))]
             else:
                 data_train_path = [f for f in glob.glob(os.path.join(data_root, "train/cloud*.pkl"))]
             train_len = cfg.data.n_training if cfg.data.n_training > 0 else len(data_train_path)

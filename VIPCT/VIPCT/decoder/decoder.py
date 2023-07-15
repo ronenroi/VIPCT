@@ -16,7 +16,7 @@
 import torch
 from torch import nn
 from VIPCT.VIPCT.mlp_function import MLPWithInputSkips2
-
+from LoRA import Linear as LoRALinear
 
 def _xavier_init(linear):
     """
@@ -197,4 +197,39 @@ class Decoder(nn.Module):
             latent_size = latent_size,
             ce_bins=ce_bins,
             use_neighbours = use_neighbours,
+        )
+
+
+class LoRA_Decoder(Decoder):
+    def __init__(
+            self,
+            lora_dim,
+            lora_alpha,
+            lora_dropout,
+            type,
+            average_cams,
+            feature_flatten,
+            latent_size,
+            ce_bins,
+            use_neighbours,
+    ):
+        super().__init__(type,
+            average_cams,
+            feature_flatten,
+            latent_size,
+            ce_bins,
+            use_neighbours)
+
+    @classmethod
+    def from_cfg(cls, cfg, latent_size, ce_bins, use_neighbours=False):
+        return cls(
+            lora_dim=cfg.decoder.lora_dim,
+            lora_alpha=cfg.decoder.lora_alpha,
+            lora_dropout=cfg.decoder.lora_dropout,
+            type=cfg.decoder.name,
+            average_cams=cfg.decoder.average_cams,
+            feature_flatten=cfg.decoder.feature_flatten,
+            latent_size=latent_size,
+            ce_bins=ce_bins,
+            use_neighbours=use_neighbours,
         )

@@ -105,8 +105,8 @@ def main(cfg: DictConfig):
     # Resume training if requested.
     if cfg.resume and os.path.isfile(checkpoint_resume_path):
         print(f"Resuming from checkpoint {checkpoint_resume_path}.")
-        loaded_data = torch.load(checkpoint_resume_path,map_location=device)
-        model.load_state_dict(loaded_data["model"])
+        loaded_data = torch.load(checkpoint_resume_path, map_location=device)
+        model.load_state_dict(loaded_data["model"], strict=False)
         # stats = pickle.loads(loaded_data["stats"])
         # print(f"   => resuming from epoch {stats.epoch}.")
         # optimizer_state_dict = loaded_data["optimizer"]
@@ -173,7 +173,8 @@ def main(cfg: DictConfig):
     if cfg.ct_net.stop_encoder_grad:
         for name, param in model.named_parameters():
             # if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
-            if 'decoder' in name and not 'mask_decoder' in name:
+            # if 'decoder' in name and not 'mask_decoder' in name:
+            if 'lora' in name:
             # if '.bn' in name:
 
                 param.requires_grad = True

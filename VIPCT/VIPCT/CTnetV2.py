@@ -18,7 +18,7 @@ import torch
 from VIPCT.scene.cameras import PerspectiveCameras, AirMSPICameras
 from VIPCT.VIPCT.mlp_function import MLPWithInputSkips, MLPIdentity
 from VIPCT.VIPCT.encoder.encoder import Backbone
-from VIPCT.VIPCT.decoder.decoder import Decoder
+from VIPCT.VIPCT.decoder.decoder import Decoder, LoRA_Decoder
 from .decoder.transformer import VipctTransformer
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -83,7 +83,7 @@ class CTnetV2(torch.nn.Module):
             self.decoder_input_size += len_mask
 
         if cfg.decoder.type == 'mlp':
-            self.decoder = Decoder.from_cfg(cfg, self.decoder_input_size, self.ce_bins, self.use_neighbours)
+            self.decoder =  LoRA_Decoder.from_cfg(cfg, self.decoder_input_size, self.ce_bins, self.use_neighbours) if cfg.decoder.apply_lora else Decoder.from_cfg(cfg, self.decoder_input_size, self.ce_bins, self.use_neighbours)
             self.decoder_type = 'mlp'
         elif cfg.decoder.type == 'transformer':
             self.decoder = VipctTransformer.from_cfg(cfg, self.decoder_input_size, self.ce_bins)

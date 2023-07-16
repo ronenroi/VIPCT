@@ -25,7 +25,7 @@
 
 from typing import Tuple
 import torch
-
+from decoder.LoRA import Linear as LoRALinear
 
 def _xavier_init(linear):
     """
@@ -183,6 +183,12 @@ class MLPWithInputSkips2(torch.nn.Module):
         skip_dim: int,
         hidden_dim: int,
         input_skips: Tuple[int] = (),
+        apply_lora: bool= False,
+        lora_dim: int = 0,
+        lora_alpha: int = 0,
+        lora_dropout: float = 0,
+        fan_in_fan_out: bool = False,
+        merge_weights: bool= False,
     ):
         """
         Args:
@@ -206,8 +212,14 @@ class MLPWithInputSkips2(torch.nn.Module):
             else:
                 dimin = hidden_dim
                 dimout = hidden_dim
-            linear = torch.nn.Linear(dimin, dimout)
-            _xavier_init(linear)
+            if not apply_lora:
+                linear = torch.nn.Linear(dimin, dimout)
+                _xavier_init(linear)
+            else:
+                linear = LoRALinear(dimin, dimout,lora_dim, lora_alpha, lora_dropout,fan_in_fan_out, merge_weights,)
+                _xavier_init(linear)
+                linear.reset_parameters()
+
             layers.append(torch.nn.Sequential(linear, torch.nn.ReLU(True)))
         self.mlp = torch.nn.ModuleList(layers)
         self._input_skips = set(input_skips)

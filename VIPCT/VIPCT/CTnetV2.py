@@ -229,7 +229,7 @@ class CTnetV2(torch.nn.Module):
                 volume, query_points, query_indices = volume.get_query_points(self.n_query, self.query_point_method, masks = masks)
         else:
             if self.query_point_method == 'toa_random':
-                volume, query_points, _ = volume.get_query_points_seq(self.n_query, self.query_point_val_method,                                                                   masks=masks)
+                volume, query_points, _ = volume.get_query_points_seq(self.n_query, self.query_point_val_method, masks=masks)
             else:
                 # volume, query_points, _ = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)
                 volume, query_points, query_indices = volume.get_query_points(self.val_n_query, self.query_point_val_method, masks = masks)

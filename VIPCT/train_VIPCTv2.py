@@ -84,12 +84,41 @@ def main(cfg: DictConfig):
         train_dataset, val_dataset = get_cloud_datasets(
             cfg=cfg
         )
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=cfg.optimizer.batch_size,
+        shuffle=True,
+        num_workers=4,
+        collate_fn=trivial_collate,
+    )
+
+    # The validation dataloader is just an endless stream of random samples.
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=1,
+        num_workers=4,
+        collate_fn=trivial_collate,
+    )
 
     # Initialize the CT model.
     model = CTnetV2(cfg=cfg, n_cam=cfg.data.n_cam)
 
     # Move the model to the relevant device.
     model.to(device)
+    if cfg.ct_net.stop_encoder_grad:
+        for name, param in model.named_parameters():
+            # if 'decoder.decoder.2.mlp.7' in name or 'decoder.decoder.3' in name:
+            # if 'decoder' in name and not 'mask_decoder' in name:
+            if 'lora' in name:
+            # if '.bn' in name:
+
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+        if cfg.ct_net.encoder_mode == 'eval':
+            model._image_encoder.eval()
+            model.mlp_cam_center.eval()
+            model.mlp_xyz.eval()
     # Init stats to None before loading.
     stats = None
     optimizer_state_dict = None
@@ -147,21 +176,7 @@ def main(cfg: DictConfig):
         optimizer, lr_lambda, last_epoch=start_epoch - 1, verbose=False
     )
 
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset,
-        batch_size=cfg.optimizer.batch_size,
-        shuffle=True,
-        num_workers=4,
-        collate_fn=trivial_collate,
-    )
 
-    # The validation dataloader is just an endless stream of random samples.
-    val_dataloader = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=1,
-        num_workers=4,
-        collate_fn=trivial_collate,
-    )
     err = torch.nn.MSELoss()
     if cfg.optimizer.ce_weight_zero:
         w_bins = torch.ones(cfg.cross_entropy.bins, device=device)
@@ -260,6 +275,24 @@ def main(cfg: DictConfig):
                 loss = [CE(ext_est,
                            to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins))
                                                              for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'L2_relative_errorV2':
+                out["output"], _, _ = get_pred_and_conf_from_discrete(out["output"],
+                                                                                           cfg.cross_entropy.min,
+                                                                                           cfg.cross_entropy.max,
+                                                                                           cfg.cross_entropy.bins,
+                                                                                           pred_type=cfg.ct_net.pred_type,
+                                                                                           conf_type=cfg.ct_net.conf_type,
+                                                                                           prob_gain=cfg.ct_net.prob_gain)
+                loss = [err(ext_est.squeeze(),ext_gt.squeeze())/(torch.norm(ext_gt.squeeze())+ 1e-2) for ext_est, ext_gt in zip(out["output"], out["volume"])]
+            elif cfg.optimizer.loss == 'L1_relative_errorV2':
+                out["output"], _, _ = get_pred_and_conf_from_discrete(out["output"],
+                                                                                           cfg.cross_entropy.min,
+                                                                                           cfg.cross_entropy.max,
+                                                                                           cfg.cross_entropy.bins,
+                                                                                           pred_type=cfg.ct_net.pred_type,
+                                                                                           conf_type=cfg.ct_net.conf_type,
+                                                                                           prob_gain=cfg.ct_net.prob_gain)
+                loss = [relative_error(ext_est.squeeze(),ext_gt.squeeze()) for ext_est, ext_gt in zip(out["output"], out["volume"])]
             elif cfg.optimizer.loss == 'CE_mask':
                 loss = [CE(ext_est,
                            to_discrete(ext_gt, cfg.cross_entropy.min, cfg.cross_entropy.max, cfg.cross_entropy.bins))
@@ -376,7 +409,7 @@ def main(cfg: DictConfig):
                             val_volume,
                             masks
                         )
-                        if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_mask' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
+                        if cfg.optimizer.loss == 'CE' or cfg.optimizer.loss == 'CE_mask' or cfg.optimizer.loss == 'L2_relative_errorV2' or cfg.optimizer.loss == 'L1_relative_errorV2' or cfg.optimizer.loss == 'CE_smooth' or cfg.optimizer.loss == 'EMD' or cfg.optimizer.loss == 'EMD2':
                             val_out["output"] = get_pred_from_discrete(val_out["output"], cfg.cross_entropy.min,
                                                                   cfg.cross_entropy.max, cfg.cross_entropy.bins)
 

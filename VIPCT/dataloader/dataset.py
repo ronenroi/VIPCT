@@ -85,77 +85,100 @@ def get_cloud_datasets(
         if dataset_name == 'CASS_10cameras_20m':
             data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
             image_size = [236, 236]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_CASS_10cameras_20m':
             data_root_cass = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_20m')
             data_root_bomex = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
+            cfg.data.image_size = [236, 236]
         elif dataset_name == 'CASS_10cameras_50m':
             data_root = os.path.join(data_root, 'CASS_50m_256x256x139_600CCN/10cameras_50m')
             image_size = [96, 96]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_10cameras_20m':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_10cameras_20m_varying_S':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_S')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_10cameras_20m_varying_M':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_M')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_10cameras_20m_varying_L':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_L')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_10cameras_20m_varying_XL':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_20m_varying_XL')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_10cameras_50m':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
             image_size = [48, 48]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_32cameras_50m':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_50m')
             image_size = [48, 48]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_32cameras':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '32cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'subset_of_seven_clouds':
             data_root = os.path.join(data_root, 'BOMEX_256x256x100_5000CCN_50m_micro_256', '10cameras_50m')
             image_size = [48, 48]
-
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_50CCN_10cameras_20m':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_50CCN_10cameras_20m_pseudo_label_no_noise':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_50CCN_10cameras_20m_pseudo_label_noise':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_50CCN_aux_10cameras_20m':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_50CCN_50m_micro_256_aux4', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'BOMEX_5000CCN_new_10cameras_20m':
             data_root = os.path.join(data_root, 'BOMEX_128x128x100_5000CCN_50m_micro_256', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'CASS_600CCN_roiprocess_10cameras_20m':
             data_root = os.path.join(data_root, 'CASS_256x256x139_600CCN_50m_32x32x32_roipreprocess', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'HAWAII_2000CCN_10cameras_20m':
             data_root = os.path.join(data_root, 'HAWAII_2000CCN_32x32x64_50m', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'DYCOMS_RF02_50CCN_10cameras_20m':
             data_root = os.path.join(data_root, 'DYCOMS_RF02_50CCN_64x64x159_50m', '10cameras_20m')
             image_size = [236, 236]
+            cfg.data.image_size = image_size
         elif dataset_name == 'DYCOMS_RF02_500CCN_10cameras_20m':
             data_root = os.path.join(data_root, 'DYCOMS_RF02_500CCN_64x64x159_50m', '10cameras_20m')
             image_size = [236, 236]
+            cfg.data.image_size = image_size
 
         elif dataset_name == 'Toy_10cameras_20m':
             data_root = os.path.join(data_root, 'Toy', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'Toy2_10cameras_20m':
             data_root = os.path.join(data_root, 'Toy2', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         elif dataset_name == 'Toy3_10cameras_20m':
             data_root = os.path.join(data_root, 'Toy_single_voxel_clouds', '10cameras_20m')
             image_size = [116, 116]
+            cfg.data.image_size = image_size
         else:
             FileNotFoundError()
 
@@ -252,6 +275,10 @@ class CloudDataset(Dataset):
         cloud_path = self.cloud_dir[idx]
         with open(cloud_path, 'rb') as f:
             data = pickle.load(f)
+        # if hasattr(data,'observed_images'):
+        #     images = data['observed_images']
+        # else:
+        #     images = data['images']
         images = data['images']
         if self.transform:
             images = self.transform(self.transform)

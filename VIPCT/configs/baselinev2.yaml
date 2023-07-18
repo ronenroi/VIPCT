@@ -1,7 +1,7 @@
 seed: 0
 debug: False
 version: 'V2'
-
+checkpoint_resume_path: ''
 data:
   n_cam: 10
   noise: False
@@ -9,6 +9,7 @@ data:
   std: 0.0072
   rand_cam: False
   full_well_val: None
+  image_size: None
 
 optimizer:
   max_epochs: 100000
@@ -35,8 +36,8 @@ ct_net:
   pred_type: 'max'
 
 backbone:
-  name: 'resnet50_fpn' #'resnet34' fasterrcnn_resnet50_fpn
-  pretrained: False
+  name: 'resnet50_fpn' #'resnet50_fpn' 'resnet34' fasterrcnn_resnet50_fpn
+  pretrained: True
   num_layers: 4
   index_interp: 'bilinear'
   index_padding: 'zeros' #'zeros', 'border', or 'reflection'
@@ -56,6 +57,12 @@ decoder:
   num_masked: None
   average_cams: False
   feature_flatten: True
+  apply_lora: False
+  lora_dim: 64
+  lora_alpha: 1000
+  lora_dropout: 0
+  fan_in_fan_out: False
+  merge_weights: False
 
 #transformer:
 #  hidden_dim: 256

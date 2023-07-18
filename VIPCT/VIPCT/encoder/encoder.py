@@ -34,6 +34,7 @@ class Backbone(nn.Module):
     def __init__(
             self,
             backbone="resnet34",
+            image_size=-1,
             pretrained=True,
             num_layers=4,
             index_interp="bilinear",
@@ -70,6 +71,7 @@ class Backbone(nn.Module):
         assert sampling_output_size>0
         if norm_type != "batch":
             assert not pretrained
+        self.name = backbone
         self.sampling_support = sampling_support
         self.use_custom_resnet = backbone == "custom"
         self.feature_scale = feature_scale
@@ -103,40 +105,71 @@ class Backbone(nn.Module):
 
         else:
             print("Using torchvision", backbone, "encoder")
-            self.model = getattr(torchvision.models, backbone)(
-                pretrained=pretrained, norm_layer=norm_layer
-            )
-            if modify_first_layer:
-                self.model.conv1 = nn.Conv2d(1, self.model.conv1.out_channels, kernel_size=3,
-                                             stride=1, padding=1,
-                                             bias=self.model.conv1.bias!=None)
+            if 'resnet'in backbone:
+                self.model = getattr(torchvision.models, backbone)(
+                    pretrained=pretrained, norm_layer=norm_layer
+                )
+                if modify_first_layer:
+                    self.model.conv1 = nn.Conv2d(1, self.model.conv1.out_channels, kernel_size=3,
+                                                 stride=1, padding=1,
+                                                 bias=self.model.conv1.bias != None)
+                    self.model.maxpool = nn.Sequential()
+                    self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale
+                                     in
+                                     [0, 0, 1, 2]]
+
+                else:
+                    self.model.conv1 = nn.Conv2d(1, self.model.conv1.out_channels,
+                                                 kernel_size=self.model.conv1.kernel_size,
+                                                 stride=self.model.conv1.stride, padding=self.model.conv1.padding,
+                                                 bias=self.model.conv1.bias != None)
+                    self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale
+                                     in
+                                     range(1, 1 + self.num_layers)]
+
+                    # Following 2 lines need to be uncommented for older cfgigs
+                    self.model.fc = nn.Sequential()
+                    self.model.avgpool = nn.Sequential()
+                    if backbone == 'resnet34':
+                        self.latent_size = [0, 64, 128, 256, 512, 1024][num_layers]
+                    elif backbone == 'resnet50':
+                        self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+                    elif backbone == 'resnet101':
+                        self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+                    elif backbone == 'fasterrcnn_resnet50_fpn':
+                        self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+                    elif backbone == 'resnet50_fpn':
+                        self.latent_size = out_channels * 4  # 256*5
+                    else:
+                        NotImplementedError()
+            else: #swin transformer
+                self.model = getattr(torchvision.models, backbone)\
+                    (weights=torchvision.models.swin_transformer.Swin_V2_B_Weights.IMAGENET1K_V1 if pretrained else None)
+                self.model=self.model.features
+                conv_in = self.model[0][0]
+
+                if modify_first_layer:
+                    self.model[0][0] = nn.Conv2d(1, conv_in.out_channels, kernel_size=3,
+                                                 stride=1, padding=1,
+                                                 bias=conv_in.bias != None)
+                    self.model.maxpool = nn.Sequential()
+
+                else:
+                    self.model[0][0] = nn.Conv2d(1, conv_in.out_channels,
+                                                 kernel_size=conv_in.kernel_size,
+                                                 stride=conv_in.stride, padding=conv_in.padding,
+                                                 bias=conv_in.bias != None)
+
+
                 self.model.maxpool = nn.Sequential()
-                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
-                                 [0,0,1,2]]
+                self.layers = [1, 3, 5, 8][:self.num_layers]
+                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale
+                                 in
+                                 [0, 1, 2, 3]]
+                self.latent_size = [128, 128+256, 128+256+512, 128+256+512+1024][num_layers-1]
 
-            else:
-                self.model.conv1 = nn.Conv2d(1, self.model.conv1.out_channels, kernel_size=self.model.conv1.kernel_size,
-                                             stride=self.model.conv1.stride, padding=self.model.conv1.padding,
-                                             bias=self.model.conv1.bias!=None)
-                self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
-                                 range(1, 1 + self.num_layers)]
-
-            # Following 2 lines need to be uncommented for older cfgigs
-            self.model.fc = nn.Sequential()
-            self.model.avgpool = nn.Sequential()
         self.sampling_output_size = sampling_output_size
-        if backbone=='resnet34':
-            self.latent_size = [0, 64, 128, 256, 512, 1024][num_layers]
-        elif backbone=='resnet50':
-            self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-        elif backbone=='resnet101':
-            self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-        elif backbone=='fasterrcnn_resnet50_fpn':
-            self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-        elif backbone=='resnet50_fpn':
-            self.latent_size = out_channels*4 # 256*5
-        else:
-            NotImplementedError()
+
         self.index_interp = index_interp
         self.index_padding = index_padding
         self.upsample_interp = upsample_interp
@@ -261,7 +294,13 @@ class Backbone(nn.Module):
             latents = self.model(x)
             del latents['pool']
             latents = [v for k,v in latents.items()]
-        else:
+        elif 'swin' in self.name:
+            latents = []
+            for layer_index, layer in enumerate(self.model):
+                x=layer(x)
+                if layer_index in self.layers:
+                    latents.append(x.permute(0,3,1,2))
+        else:#resnt
             x = self.model.conv1(x)
             x = self.model.bn1(x)
             x = self.model.relu(x)
@@ -289,6 +328,7 @@ class Backbone(nn.Module):
     def from_cfg(cls, cfg):
         return cls(
             cfg.backbone.name,
+            cfg.data.image_size,
             pretrained=cfg.backbone.pretrained,
             num_layers=cfg.backbone.num_layers,
             index_interp=cfg.backbone.index_interp,

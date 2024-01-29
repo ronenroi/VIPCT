@@ -102,6 +102,10 @@ class Backbone(nn.Module):
                 self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale in
                                  range(5)]
             self.model.body.maxpool = nn.Sequential()
+            if backbone == 'fasterrcnn_resnet50_fpn':
+                self.latent_size = [0, 64, 320, 832, 1856][num_layers]
+            elif backbone == 'resnet50_fpn':
+                self.latent_size = out_channels * 4  # 256*5
 
         else:
             print("Using torchvision", backbone, "encoder")
@@ -136,15 +140,23 @@ class Backbone(nn.Module):
                         self.latent_size = [0, 64, 320, 832, 1856][num_layers]
                     elif backbone == 'resnet101':
                         self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-                    elif backbone == 'fasterrcnn_resnet50_fpn':
-                        self.latent_size = [0, 64, 320, 832, 1856][num_layers]
-                    elif backbone == 'resnet50_fpn':
-                        self.latent_size = out_channels * 4  # 256*5
+
                     else:
                         NotImplementedError()
-            else: #swin transformer
+            elif 'swin' in backbone: #swin transformer
+                init_weights = None
+                if backbone == 'swin_v2_t':
+                    if pretrained:
+                        init_weights = torchvision.models.swin_transformer.Swin_V2_T_Weights.IMAGENET1K_V1
+                    self.latent_size = [96, 96 + 192, 96 + 192 + 384, 96 + 192 + 384 + 768][num_layers - 1]
+
+                elif backbone == 'swin_v2_b':
+                    if pretrained:
+                        init_weights = torchvision.models.swin_transformer.Swin_V2_B_Weights.IMAGENET1K_V1
+                    self.latent_size = [128, 128 + 256, 128 + 256 + 512, 128 + 256 + 512 + 1024][num_layers - 1]
+
                 self.model = getattr(torchvision.models, backbone)\
-                    (weights=torchvision.models.swin_transformer.Swin_V2_B_Weights.IMAGENET1K_V1 if pretrained else None)
+                    (weights=init_weights)
                 self.model=self.model.features
                 conv_in = self.model[0][0]
 
@@ -166,8 +178,9 @@ class Backbone(nn.Module):
                 self.samplers = [ROIAlign((sampling_output_size, sampling_output_size), 0.5 ** scale, 0) for scale
                                  in
                                  [0, 1, 2, 3]]
-                self.latent_size = [128, 128+256, 128+256+512, 128+256+512+1024][num_layers-1]
 
+            else:
+                NotImplementedError()
         self.sampling_output_size = sampling_output_size
 
         self.index_interp = index_interp
